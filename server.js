@@ -7,15 +7,12 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Servir les fichiers statiques depuis le dossier 'public'
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Route explicite pour la racine
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Liste des joueurs connectés au salon
 let players = {};
 
 io.on('connection', (socket) => {

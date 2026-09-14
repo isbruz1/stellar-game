@@ -8,8 +8,8 @@
 </head>
 <body>
 
-    <!-- Écran du Salon (Lobby) -->
     <div id="lobby-screen" class="screen">
+        <img src="assets/stellar.png" alt="Logo Stellar Game" id="game-logo">
         <h1>✨ STELLAR GAME ✨</h1>
         <div class="login-box">
             <input type="text" id="username-input" placeholder="Entre ton pseudo..." maxlength="15">
@@ -18,20 +18,16 @@
 
         <div id="room-container" style="display: none;">
             <h3>Joueurs dans le salon</h3>
-            <ul id="players-list">
-                <!-- La liste des joueurs s'affiche ici -->
-            </ul>
+            <ul id="players-list"></ul>
             <button id="ready-btn" class="btn not-ready">Je ne suis pas prêt</button>
             <p id="waiting-msg">En attente que tout le monde soit prêt...</p>
         </div>
     </div>
 
-    <!-- Écran du Jeu (Canvas) -->
     <div id="game-screen" style="display: none;">
         <canvas id="gameCanvas" width="800" height="600"></canvas>
     </div>
 
-    <!-- Socket.io script -->
     <script src="/socket.io/socket.io.js"></script>
     <script src="game.js"></script>
 </body>

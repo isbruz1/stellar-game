@@ -1,6 +1,5 @@
 const socket = io();
 
-// Éléments du DOM
 const lobbyScreen = document.getElementById('lobby-screen');
 const gameScreen = document.getElementById('game-screen');
 const usernameInput = document.getElementById('username-input');
@@ -15,8 +14,8 @@ const ctx = canvas.getContext('2d');
 let isReady = false;
 let gameStarted = false;
 let allPlayers = {};
+let pulseEffect = 0;
 
-// 1. Rejoindre le salon
 joinBtn.addEventListener('click', () => {
     const username = usernameInput.value.trim();
     if (username === '') {
@@ -24,21 +23,17 @@ joinBtn.addEventListener('click', () => {
         return;
     }
 
-    // Envoyer le pseudo au serveur
     socket.emit('join-lobby', username);
 
-    // Masquer le champ pseudo et afficher la salle d'attente
     usernameInput.style.display = 'none';
     joinBtn.style.display = 'none';
     roomContainer.style.display = 'block';
 });
 
-// 2. Cliquer sur le bouton Prêt / Pas prêt
 readyBtn.addEventListener('click', () => {
     socket.emit('toggle-ready');
 });
 
-// 3. Mettre à jour l'affichage du salon en temps réel
 socket.on('update-lobby', (players) => {
     allPlayers = players;
     playersList.innerHTML = '';
@@ -46,7 +41,6 @@ socket.on('update-lobby', (players) => {
     let totalPlayers = 0;
     let allReady = true;
 
-    // Trouver notre propre état
     if (players[socket.id]) {
         isReady = players[socket.id].ready;
         if (isReady) {
@@ -58,7 +52,6 @@ socket.on('update-lobby', (players) => {
         }
     }
 
-    // Remplir la liste des joueurs
     for (let id in players) {
         let p = players[id];
         totalPlayers++;
@@ -76,11 +69,9 @@ socket.on('update-lobby', (players) => {
         }
     }
 
-    // Si tout le monde est prêt et qu'il y a au moins 1 joueur (ou 2 selon tes préférences)
     if (totalPlayers > 0 && allReady) {
         waitingMsg.textContent = "Tous les joueurs sont prêts ! Lancement imminent...";
         
-        // Lancer le jeu après une courte pause de 1 seconde
         setTimeout(() => {
             if (!gameStarted) {
                 startGame();
@@ -91,39 +82,41 @@ socket.on('update-lobby', (players) => {
     }
 });
 
-// 4. Fonction pour basculer vers l'écran de jeu
 function startGame() {
     gameStarted = true;
     lobbyScreen.style.display = 'none';
     gameScreen.style.display = 'block';
 
-    // Démarrer la boucle de rendu du jeu
     requestAnimationFrame(gameLoop);
 }
 
-// 5. Boucle principale du jeu (Render basique pour l'instant)
 function gameLoop() {
-    // Nettoyer le canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Dessiner un fond de grille / espace
     ctx.fillStyle = "#0f172a";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Afficher les joueurs connectés
+    pulseEffect += 0.05;
+    let glowSize = 20 + Math.sin(pulseEffect) * 3;
+
     for (let id in allPlayers) {
         let p = allPlayers[id];
+        
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = (id === socket.id) ? "#38bdf8" : "#f43f5e";
+
         ctx.fillStyle = (id === socket.id) ? "#38bdf8" : "#f43f5e";
         ctx.beginPath();
-        ctx.arc(p.x, p.y, 20, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, glowSize, 0, Math.PI * 2);
         ctx.fill();
         ctx.closePath();
 
-        // Afficher le pseudo au-dessus du joueur
+        ctx.shadowBlur = 0;
+
         ctx.fillStyle = "#ffffff";
-        ctx.font = "14px sans-serif";
+        ctx.font = "14px 'Segoe UI', sans-serif";
         ctx.textAlign = "center";
-        ctx.fillText(p.username, p.x, p.y - 28);
+        ctx.fillText(p.username, p.x, p.y - 32);
     }
 
     requestAnimationFrame(gameLoop);
