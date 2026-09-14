@@ -31,18 +31,18 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 20px;
+    gap: 25px;
 }
 
 #intro-logo {
-    width: 150px;
-    height: 150px;
+    width: 220px; /* Icône beaucoup plus grande pour l'intro */
+    height: 220px;
     border-radius: 50%;
     object-fit: cover;
-    border: 3px solid #38bdf8;
-    box-shadow: 0 0 30px rgba(56, 189, 248, 0.6);
+    border: 4px solid #38bdf8;
+    box-shadow: 0 0 40px rgba(56, 189, 248, 0.7);
     opacity: 0;
-    transform: scale(0.7);
+    transform: scale(0.6);
     transition: all 1.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
@@ -52,12 +52,12 @@ body {
 }
 
 #typed-welcome-text {
-    font-size: 22px;
+    font-size: 24px;
     color: #38bdf8;
     font-weight: 600;
     letter-spacing: 1px;
-    min-height: 30px;
-    text-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
+    min-height: 35px;
+    text-shadow: 0 0 12px rgba(56, 189, 248, 0.5);
     margin: 0;
 }
 
@@ -65,7 +65,7 @@ body {
 .splash-container {
     text-align: center;
     background: rgba(18, 24, 38, 0.85);
-    padding: 50px 40px;
+    padding: 45px 40px;
     border-radius: 20px;
     box-shadow: 0 15px 35px rgba(0, 0, 0, 0.7), 0 0 40px rgba(56, 189, 248, 0.1);
     width: 420px;
@@ -74,11 +74,11 @@ body {
     transition: opacity 1s ease-in-out;
 }
 
-/* Style et animation de l'icône dans le menu */
+/* Style et animation de l'icône dans le menu (agrandie aussi) */
 .logo-wrapper {
     position: relative;
-    width: 130px;
-    height: 130px;
+    width: 150px;
+    height: 150px;
     margin: 0 auto 20px auto;
 }
 
@@ -101,7 +101,7 @@ body {
     height: 100%;
     background: #38bdf8;
     border-radius: 50%;
-    filter: blur(20px);
+    filter: blur(22px);
     opacity: 0.5;
     z-index: 1;
     animation: pulseGlow 3s ease-in-out infinite;
@@ -130,7 +130,7 @@ body {
 .game-subtitle {
     font-size: 13px;
     color: #94a3b8;
-    margin: 0 0 30px 0;
+    margin: 0 0 25px 0;
 }
 
 /* Boutons du menu */
@@ -138,7 +138,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 15px;
-    margin-bottom: 30px;
+    margin-bottom: 25px;
 }
 
 .menu-btn {
