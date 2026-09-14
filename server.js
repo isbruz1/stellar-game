@@ -7,7 +7,7 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 // Servir les fichiers statiques (HTML, CSS, JS) depuis le dossier racine ou 'public'
-app.use(express.static(__dirname));
+app.use(express.static('public'));
 
 // Liste des joueurs connectés au salon
 let players = {};
