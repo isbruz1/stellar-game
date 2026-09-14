@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stellar Game - Intro</title>
+    <title>Stellar Game - Connexion</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -16,8 +16,27 @@
         </div>
     </div>
 
-    <!-- Écran de démarrage / Accueil (masqué au début pendant l'intro) -->
-    <div id="splash-screen" class="splash-container" style="opacity: 0; pointer-events: none;">
+    <!-- Écran de verrouillage / Saisie du pseudo (S'affiche après l'intro) -->
+    <div id="login-screen" class="login-container" style="display: none; opacity: 0;">
+        <div class="login-box">
+            <img src="assets/stellar.png" alt="Logo" class="login-logo">
+            <h2>Bienvenue pilote !</h2>
+            <p>Entre ton pseudo pour entrer dans la zone de combat</p>
+            
+            <div class="input-group">
+                <input type="text" id="username-input" placeholder="Ton pseudo..." maxlength="15" autocomplete="off">
+                <button id="validate-btn" class="menu-btn primary">Valider ➔</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Message de salutation animé après validation du pseudo -->
+    <div id="welcome-message-overlay" class="welcome-overlay" style="display: none;">
+        <h1 id="animated-greeting"></h1>
+    </div>
+
+    <!-- Écran de démarrage / Menu Principal (Masqué au début) -->
+    <div id="splash-screen" class="splash-container" style="display: none; opacity: 0;">
         
         <!-- Icône du jeu -->
         <div class="logo-wrapper">
