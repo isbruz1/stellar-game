@@ -1,199 +1,38 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>✨ STELLAR GAME</title>
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stellar Game - Salon</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-  <!-- ══════════ ÉCRAN DE DÉMARRAGE ══════════ -->
-  <div id="splash">
-    <div class="splash-bg"></div>
-    <div class="splash-logo">
-      <img src="assets/logo.png" alt="Stellar Game">
-    </div>
-    <div class="splash-loader">
-      <div class="loader-bar"><div class="loader-fill"></div></div>
-      <span class="loader-text">Chargement de l'univers...</span>
-    </div>
-  </div>
-
-  <!-- ══════════ MENU PRINCIPAL ══════════ -->
-  <div id="mainMenu" class="hidden">
-    <div class="menu-stars"></div>
-    <div class="menu-content">
-      <img src="assets/logo.png" alt="Stellar Game" class="menu-logo">
-      <div class="menu-buttons">
-        <button class="menu-btn primary" id="btnPlay">
-          <span class="btn-icon">▶</span> JOUER
-        </button>
-        <button class="menu-btn" id="btnSettings">
-          <span class="btn-icon">⚙</span> PARAMÈTRES
-        </button>
-        <button class="menu-btn soon" id="btnSoon">
-          <span class="btn-icon">✨</span> BIENTÔT
-          <span class="soon-badge">NEW</span>
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ══════════ MENU JOUER (SALLES) ══════════ -->
-  <div id="playMenu" class="hidden">
-    <div class="menu-stars"></div>
-    <div class="play-panel">
-      <button class="back-btn" id="backToMain">← RETOUR</button>
-      <h2>🌌 SALLES DE JEU</h2>
-
-      <div class="pseudo-section">
-        <label>TON PSEUDO</label>
-        <input id="pseudoInput" placeholder="Entre ton pseudo..." maxlength="15">
-      </div>
-
-      <div class="room-actions">
-        <button class="room-btn create" id="btnCreateRoom">
-          <div class="room-icon">+</div>
-          <div>
-            <strong>CRÉER UNE SALLE</strong>
-            <small>Salle publique ou privée</small>
-          </div>
-        </button>
-        <button class="room-btn join" id="btnJoinRoom">
-          <div class="room-icon">→</div>
-          <div>
-            <strong>REJOINDRE UNE SALLE</strong>
-            <small>Avec un code de salle</small>
-          </div>
-        </button>
-      </div>
-
-      <div class="public-rooms">
-        <h3>📡 Salles publiques</h3>
-        <div id="roomsList" class="rooms-list">
-          <p class="empty">Aucune salle pour le moment...</p>
+    <!-- Écran du Salon (Lobby) -->
+    <div id="lobby-screen" class="screen">
+        <h1>✨ STELLAR GAME ✨</h1>
+        <div class="login-box">
+            <input type="text" id="username-input" placeholder="Entre ton pseudo..." maxlength="15">
+            <button id="join-btn" class="btn">Rejoindre le salon</button>
         </div>
-        <button class="refresh-btn" id="btnRefreshRooms">🔄 Actualiser</button>
-      </div>
-    </div>
-  </div>
 
-  <!-- ══════════ MODALE CRÉER SALLE ══════════ -->
-  <div id="createModal" class="modal hidden">
-    <div class="modal-content">
-      <h3>Créer une salle</h3>
-      <label class="radio-option">
-        <input type="radio" name="roomType" value="public" checked>
-        <span>🌍 Publique — tout le monde peut rejoindre</span>
-      </label>
-      <label class="radio-option">
-        <input type="radio" name="roomType" value="private">
-        <span>🔒 Privée — code requis</span>
-      </label>
-      <div class="modal-actions">
-        <button class="menu-btn cancel" id="cancelCreate">Annuler</button>
-        <button class="menu-btn primary" id="confirmCreate">Créer</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ══════════ MODALE REJOINDRE SALLE ══════════ -->
-  <div id="joinModal" class="modal hidden">
-    <div class="modal-content">
-      <h3>Rejoindre une salle</h3>
-      <p class="hint-text">Entre le code de la salle :</p>
-      <input id="roomCodeInput" placeholder="EX: A1B2C3" maxlength="6" style="text-transform:uppercase;">
-      <div class="modal-actions">
-        <button class="menu-btn cancel" id="cancelJoin">Annuler</button>
-        <button class="menu-btn primary" id="confirmJoin">Rejoindre</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ══════════ MODALE PARTAGER LE CODE ══════════ -->
-  <div id="shareModal" class="modal hidden">
-    <div class="modal-content">
-      <h3>🎉 Salle créée !</h3>
-      <p class="hint-text">Partage ce code avec tes amis :</p>
-      <div class="code-display" id="sharedCode">------</div>
-      <button class="menu-btn primary" id="copyCode">📋 COPIER LE CODE</button>
-      <button class="menu-btn primary" id="enterGame">ENTRER EN JEU</button>
-    </div>
-  </div>
-
-  <!-- ══════════ MENU PARAMÈTRES ══════════ -->
-  <div id="settingsMenu" class="hidden">
-    <div class="menu-stars"></div>
-    <div class="settings-panel">
-      <button class="back-btn" id="backFromSettings">← RETOUR</button>
-      <h2>⚙️ PARAMÈTRES</h2>
-
-      <div class="setting-row">
-        <label>Volume des effets</label>
-        <input type="range" id="sfxVolume" min="0" max="100" value="70">
-      </div>
-      <div class="setting-row">
-        <label>Volume musique</label>
-        <input type="range" id="musicVolume" min="0" max="100" value="50">
-      </div>
-      <div class="setting-row">
-        <label>Afficher la grille</label>
-        <input type="checkbox" id="showGrid" checked>
-      </div>
-      <div class="setting-row">
-        <label>Afficher les pseudos</label>
-        <input type="checkbox" id="showPseudos" checked>
-      </div>
-      <div class="setting-row">
-        <label>Couleur de ton tank</label>
-        <input type="color" id="tankColor" value="#00aaff">
-      </div>
-    </div>
-  </div>
-
-  <!-- ══════════ HUD EN JEU ══════════ -->
-  <div id="hud" class="hidden">
-    <div id="topbar">
-      <div id="roomBadge">Salle: <span id="roomIdDisplay">----</span> <button id="leaveBtn">Quitter</button></div>
-      <div id="hpBar">
-        <div id="hpFill"></div>
-        <span id="hpText">100 HP</span>
-      </div>
-      <div id="stats">
-        <span id="kills">🎯 0 kills</span>
-        <span id="alive">👥 0 / 0</span>
-      </div>
+        <div id="room-container" style="display: none;">
+            <h3>Joueurs dans le salon</h3>
+            <ul id="players-list">
+                <!-- La liste des joueurs s'affiche ici -->
+            </ul>
+            <button id="ready-btn" class="btn not-ready">Je ne suis pas prêt</button>
+            <p id="waiting-msg">En attente que tout le monde soit prêt...</p>
+        </div>
     </div>
 
-    <div id="leaderboard">
-      <h3>🏆 Classement</h3>
-      <ul id="lbList"></ul>
+    <!-- Écran du Jeu (Canvas) -->
+    <div id="game-screen" style="display: none;">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
     </div>
 
-    <div id="killfeed"></div>
-
-    <div id="zonePopup" class="hidden">
-      <div id="zonePopupIcon">⚠️</div>
-      <div id="zonePopupText"></div>
-    </div>
-  </div>
-
-  <div id="deathScreen" class="hidden">
-    <h1>☠️ ÉLIMINÉ</h1>
-    <p>Tu as été détruit au combat...</p>
-    <button id="respawnBtn">RÉAPPARAÎTRE</button>
-  </div>
-
-  <div id="winScreen" class="hidden">
-    <h1>🏆 VICTOIRE !</h1>
-    <p id="winnerName"></p>
-    <p class="hint">Nouvelle manche dans 5 secondes...</p>
-  </div>
-
-  <canvas id="game" class="hidden"></canvas>
-
-  <script src="/socket.io/socket.io.js"></script>
-  <script src="game.js"></script>
+    <!-- Socket.io script -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="game.js"></script>
 </body>
 </html>

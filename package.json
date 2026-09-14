@@ -1,6 +1,7 @@
 {
   "name": "stellar-game",
   "version": "1.0.0",
+  "description": "Jeu multijoueur Stellar Game",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
