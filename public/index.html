@@ -3,15 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stellar Game - Écran de Démarrage</title>
+    <title>Stellar Game - Intro</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <!-- Écran de démarrage / Accueil -->
-    <div id="splash-screen" class="splash-container">
+    <!-- Cinématique d'introduction -->
+    <div id="intro-overlay" class="intro-overlay">
+        <div class="intro-content">
+            <img src="assets/stellar.png" alt="Stellar Game Logo" id="intro-logo">
+            <h2 id="typed-welcome-text"></h2>
+        </div>
+    </div>
+
+    <!-- Écran de démarrage / Accueil (masqué au début pendant l'intro) -->
+    <div id="splash-screen" class="splash-container" style="opacity: 0; pointer-events: none;">
         
-        <!-- Icône du jeu en grand avec animation -->
+        <!-- Icône du jeu -->
         <div class="logo-wrapper">
             <img src="assets/stellar.png" alt="Stellar Game Logo" id="splash-logo">
             <div class="logo-glow"></div>
