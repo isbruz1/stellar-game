@@ -3,31 +3,38 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stellar Game - Salon</title>
+    <title>Stellar Game - Écran de Démarrage</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <div id="lobby-screen" class="screen">
-        <img src="assets/stellar.png" alt="Logo Stellar Game" id="game-logo">
-        <h1>✨ STELLAR GAME ✨</h1>
-        <div class="login-box">
-            <input type="text" id="username-input" placeholder="Entre ton pseudo..." maxlength="15">
-            <button id="join-btn" class="btn">Rejoindre le salon</button>
+    <!-- Écran de démarrage / Accueil -->
+    <div id="splash-screen" class="splash-container">
+        
+        <!-- Icône du jeu en grand avec animation -->
+        <div class="logo-wrapper">
+            <img src="assets/stellar.png" alt="Stellar Game Logo" id="splash-logo">
+            <div class="logo-glow"></div>
         </div>
 
-        <div id="room-container" style="display: none;">
-            <h3>Joueurs dans le salon</h3>
-            <ul id="players-list"></ul>
-            <button id="ready-btn" class="btn not-ready">Je ne suis pas prêt</button>
-            <p id="waiting-msg">En attente que tout le monde soit prêt...</p>
+        <h1 class="game-title">STELLAR GAME</h1>
+        <p class="game-subtitle">Préparez vos canons, le combat spatial commence</p>
+
+        <!-- Menu principal -->
+        <div class="menu-box">
+            <button id="start-btn" class="menu-btn primary">🎮 Jouer / Salon</button>
+            <button id="settings-btn" class="menu-btn secondary">⚙️ Paramètres <span class="badge-soon">(Bientôt)</span></button>
         </div>
+
+        <!-- Indicateur de statut de connexion au serveur -->
+        <div id="server-status" class="status-offline">
+            <span class="status-dot"></span> 
+            <span id="status-text">Connexion au serveur...</span>
+        </div>
+
     </div>
 
-    <div id="game-screen" style="display: none;">
-        <canvas id="gameCanvas" width="800" height="600"></canvas>
-    </div>
-
+    <!-- Socket.io et script principal -->
     <script src="/socket.io/socket.io.js"></script>
     <script src="game.js"></script>
 </body>
