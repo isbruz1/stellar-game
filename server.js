@@ -1,312 +1,212 @@
 const express = require("express");
 const http = require("http");
-const { Server } = require("socket.io");
-const crypto = require("crypto");
 const path = require("path");
+const { Server } = require("socket.io");
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+  cors: { origin: "*" }
+});
 
-const PORT = process.env.PORT || 3000;
-
+// ⚠️ On sert le dossier public/ (pas la racine)
 app.use(express.static(path.join(__dirname, "public")));
 
-const rooms = new Map();
+// ----- Constantes -----
+const MAP_W = 2400, MAP_H = 2400;
+const PLAYER_RADIUS = 24;
+const PLAYER_SPEED = 3.4;
+const BULLET_SPEED = 9;
+const BULLET_LIFE = 150;
+const BULLET_DAMAGE = 25;
+const SHOOT_COOLDOWN = 350;
+const RESPAWN_TIME = 3000;
+const MAX_HP = 100;
 
-function generateRoomId() {
-    return crypto.randomBytes(4).toString("hex").toUpperCase();
+const players = {};
+let hostId = null;
+let gameStarted = false;
+let bullets = [];
+let bulletSeq = 0;
+
+function publicPlayers() {
+  const out = {};
+  for (const id in players) {
+    const p = players[id];
+    out[id] = { id, pseudo: p.pseudo, skin: p.skin, ready: p.ready };
+  }
+  return out;
 }
 
-function generateCode() {
-    return "STL-" + crypto.randomBytes(3).toString("hex").toUpperCase();
-}
-
-function cleanName(name, fallback = "Serveur Stellar") {
-    if (!name || typeof name !== "string") return fallback;
-
-    return name
-        .trim()
-        .replace(/[<>]/g, "")
-        .slice(0, 24) || fallback;
-}
-
-function cleanPseudo(name) {
-    if (!name || typeof name !== "string") return "Pilote";
-
-    return name
-        .trim()
-        .replace(/[<>]/g, "")
-        .slice(0, 16) || "Pilote";
-}
-
-function publicRoomInfo(room) {
-    return {
-        id: room.id,
-        name: room.name,
-        maxPlayers: room.maxPlayers,
-        players: room.players.size,
-        private: room.private,
-        hidden: room.hidden
+function buildState() {
+  const p = {};
+  for (const id in players) {
+    const pl = players[id];
+    p[id] = {
+      id, x: pl.x, y: pl.y, angle: pl.angle,
+      skin: pl.skin, hp: pl.hp, alive: pl.alive, pseudo: pl.pseudo
     };
+  }
+  return { players: p, bullets: bullets.map(b => ({ id: b.id, x: b.x, y: b.y })) };
 }
 
-function visibleRooms() {
-    return [...rooms.values()]
-        .filter(room => !room.hidden && !room.private)
-        .map(publicRoomInfo);
+function broadcastLobby() {
+  io.emit("lobby-update", { players: publicPlayers(), hostId, gameStarted });
 }
 
-function broadcastRooms() {
-    io.emit("room-list", visibleRooms());
-}
-
-function roomPlayerList(room) {
-    return [...room.players.values()].map(player => ({
-        id: player.id,
-        pseudo: player.pseudo,
-        x: player.x,
-        y: player.y,
-        angle: player.angle,
-        bodyAngle: player.bodyAngle
-    }));
+function resetForGame() {
+  bullets = [];
+  const ids = Object.keys(players);
+  ids.forEach((id, i) => {
+    const p = players[id];
+    const a = (i / ids.length) * Math.PI * 2;
+    p.x = MAP_W / 2 + Math.cos(a) * 350;
+    p.y = MAP_H / 2 + Math.sin(a) * 350;
+    p.angle = a + Math.PI;
+    p.hp = MAX_HP;
+    p.alive = true;
+    p.lastShot = 0;
+  });
 }
 
 io.on("connection", socket => {
+  socket.on("join-lobby", data => {
+    if (!hostId) hostId = socket.id;
+    players[socket.id] = {
+      id: socket.id,
+      pseudo: String(data.pseudo || "Joueur").slice(0, 16) || "Joueur",
+      skin: Number(data.skin) || 0,
+      ready: false,
+      x: MAP_W / 2, y: MAP_H / 2, angle: 0,
+      hp: MAX_HP, alive: true, lastShot: 0
+    };
+    broadcastLobby();
+  });
 
-    console.log("Joueur connecté :", socket.id);
+  socket.on("update-pseudo", pseudo => {
+    const p = players[socket.id];
+    if (!p) return;
+    p.pseudo = String(pseudo).slice(0, 16) || "Joueur";
+    broadcastLobby();
+  });
 
-    socket.emit("room-list", visibleRooms());
+  socket.on("update-skin", skin => {
+    const p = players[socket.id];
+    if (!p) return;
+    p.skin = Number(skin) || 0;
+    broadcastLobby();
+  });
 
-    socket.on("get-rooms", () => {
-        socket.emit("room-list", visibleRooms());
+  socket.on("toggle-ready", () => {
+    const p = players[socket.id];
+    if (p && socket.id !== hostId) {
+      p.ready = !p.ready;
+      broadcastLobby();
+    }
+  });
+
+  socket.on("start-game", () => {
+    if (socket.id !== hostId) return;
+    const guests = Object.values(players).filter(p => p.id !== hostId);
+    if (guests.length > 0 && !guests.every(p => p.ready)) return;
+    resetForGame();
+    gameStarted = true;
+    io.emit("game-started");
+    io.emit("state", buildState());
+  });
+
+  socket.on("leave-game", () => {
+    const p = players[socket.id];
+    if (p) { p.ready = false; p.hp = MAX_HP; p.alive = true; }
+    if (socket.id === hostId) {
+      gameStarted = false;
+      bullets = [];
+      io.emit("game-ended");
+    }
+    broadcastLobby();
+  });
+
+  socket.on("input", data => {
+    const p = players[socket.id];
+    if (!p || !gameStarted || !p.alive) return;
+    const k = data.keys || {};
+    let dx = 0, dy = 0;
+    if (k.up) dy -= 1;
+    if (k.down) dy += 1;
+    if (k.left) dx -= 1;
+    if (k.right) dx += 1;
+    const len = Math.hypot(dx, dy);
+    if (len > 0) {
+      p.x += (dx / len) * PLAYER_SPEED;
+      p.y += (dy / len) * PLAYER_SPEED;
+    }
+    p.x = Math.max(PLAYER_RADIUS, Math.min(MAP_W - PLAYER_RADIUS, p.x));
+    p.y = Math.max(PLAYER_RADIUS, Math.min(MAP_H - PLAYER_RADIUS, p.y));
+    if (typeof data.angle === "number") p.angle = data.angle;
+  });
+
+  socket.on("shoot", data => {
+    const p = players[socket.id];
+    if (!p || !gameStarted || !p.alive) return;
+    const now = Date.now();
+    if (now - p.lastShot < SHOOT_COOLDOWN) return;
+    p.lastShot = now;
+    if (typeof data.angle === "number") p.angle = data.angle;
+    bullets.push({
+      id: ++bulletSeq,
+      x: p.x + Math.cos(p.angle) * 34,
+      y: p.y + Math.sin(p.angle) * 34,
+      vx: Math.cos(p.angle) * BULLET_SPEED,
+      vy: Math.sin(p.angle) * BULLET_SPEED,
+      owner: socket.id, life: BULLET_LIFE
     });
+  });
 
-    socket.on("create-room", data => {
+  socket.on("disconnect", () => {
+    delete players[socket.id];
+    if (socket.id === hostId) hostId = Object.keys(players)[0] || null;
+    if (Object.keys(players).length === 0) { gameStarted = false; bullets = []; }
+    broadcastLobby();
+  });
+});
 
-        const name = cleanName(data?.name);
-        const pseudo = cleanPseudo(data?.pseudo);
-
-        let maxPlayers = Number(data?.maxPlayers) || 8;
-
-        maxPlayers = Math.max(2, Math.min(maxPlayers, 16));
-
-        const isPrivate = Boolean(data?.private);
-        const isHidden = Boolean(data?.hidden);
-
-        const roomId = generateRoomId();
-        const accessCode = generateCode();
-
-        const room = {
-            id: roomId,
-            name,
-            maxPlayers,
-            private: isPrivate,
-            hidden: isHidden,
-
-            code: accessCode,
-
-            owner: socket.id,
-
-            players: new Map()
-        };
-
-        room.players.set(socket.id, {
-            id: socket.id,
-            pseudo,
-            x: 500,
-            y: 400,
-            angle: 0,
-            bodyAngle: 0
-        });
-
-        rooms.set(roomId, room);
-
-        socket.join(roomId);
-
-        socket.data.roomId = roomId;
-        socket.data.pseudo = pseudo;
-
-        socket.emit("room-created", {
-            room: publicRoomInfo(room),
-            code: accessCode,
-            hidden: isHidden
-        });
-
-        socket.emit("room-state", {
-            room: publicRoomInfo(room),
-            players: roomPlayerList(room)
-        });
-
-        broadcastRooms();
-    });
-
-    socket.on("join-room", data => {
-
-        const roomId = String(data?.roomId || "").trim().toUpperCase();
-        const code = String(data?.code || "").trim().toUpperCase();
-        const pseudo = cleanPseudo(data?.pseudo);
-
-        const room = rooms.get(roomId);
-
-        if (!room) {
-            socket.emit("room-error", "Ce serveur n'existe plus.");
-            return;
-        }
-
-        if (room.players.size >= room.maxPlayers) {
-            socket.emit("room-error", "Ce serveur est complet.");
-            return;
-        }
-
-        if (room.private || room.hidden) {
-
-            if (!code || code !== room.code) {
-                socket.emit("room-error", "Code privé incorrect.");
-                return;
+function tick() {
+  if (!gameStarted) return;
+  for (let i = bullets.length - 1; i >= 0; i--) {
+    const b = bullets[i];
+    b.x += b.vx; b.y += b.vy; b.life--;
+    if (b.life <= 0 || b.x < 0 || b.x > MAP_W || b.y < 0 || b.y > MAP_H) {
+      bullets.splice(i, 1); continue;
+    }
+    let hit = false;
+    for (const id in players) {
+      if (id === b.owner) continue;
+      const p = players[id];
+      if (!p.alive) continue;
+      if (Math.hypot(p.x - b.x, p.y - b.y) < PLAYER_RADIUS) {
+        p.hp -= BULLET_DAMAGE;
+        hit = true;
+        if (p.hp <= 0) {
+          p.hp = 0; p.alive = false;
+          const pid = id;
+          setTimeout(() => {
+            const pp = players[pid];
+            if (pp && gameStarted) {
+              pp.hp = MAX_HP; pp.alive = true;
+              pp.x = Math.random() * MAP_W;
+              pp.y = Math.random() * MAP_H;
             }
+          }, RESPAWN_TIME);
         }
-
-        room.players.set(socket.id, {
-            id: socket.id,
-            pseudo,
-            x: 300 + Math.random() * 500,
-            y: 250 + Math.random() * 300,
-            angle: 0,
-            bodyAngle: 0
-        });
-
-        socket.join(roomId);
-
-        socket.data.roomId = roomId;
-        socket.data.pseudo = pseudo;
-
-        socket.emit("room-joined", {
-            room: publicRoomInfo(room),
-            owner: room.owner === socket.id
-        });
-
-        io.to(roomId).emit("room-state", {
-            room: publicRoomInfo(room),
-            players: roomPlayerList(room)
-        });
-
-        broadcastRooms();
-    });
-
-    socket.on("leave-room", () => {
-        leaveRoom(socket);
-    });
-
-    socket.on("player-update", data => {
-
-        const roomId = socket.data.roomId;
-
-        if (!roomId) return;
-
-        const room = rooms.get(roomId);
-
-        if (!room) return;
-
-        const player = room.players.get(socket.id);
-
-        if (!player) return;
-
-        if (typeof data.x === "number") player.x = data.x;
-        if (typeof data.y === "number") player.y = data.y;
-        if (typeof data.angle === "number") player.angle = data.angle;
-        if (typeof data.bodyAngle === "number") {
-            player.bodyAngle = data.bodyAngle;
-        }
-
-        socket.to(roomId).emit("player-update", {
-            id: socket.id,
-            x: player.x,
-            y: player.y,
-            angle: player.angle,
-            bodyAngle: player.bodyAngle
-        });
-    });
-
-    socket.on("player-shot", data => {
-
-        const roomId = socket.data.roomId;
-
-        if (!roomId) return;
-
-        socket.to(roomId).emit("player-shot", {
-            id: socket.id,
-            x: Number(data?.x) || 0,
-            y: Number(data?.y) || 0,
-            angle: Number(data?.angle) || 0
-        });
-    });
-
-    socket.on("disconnect", () => {
-
-        console.log("Joueur déconnecté :", socket.id);
-
-        leaveRoom(socket);
-    });
-});
-
-function leaveRoom(socket) {
-
-    const roomId = socket.data.roomId;
-
-    if (!roomId) return;
-
-    const room = rooms.get(roomId);
-
-    if (!room) return;
-
-    room.players.delete(socket.id);
-
-    socket.leave(roomId);
-
-    if (room.owner === socket.id) {
-
-        if (room.players.size > 0) {
-
-            const nextPlayer = room.players.keys().next().value;
-
-            room.owner = nextPlayer;
-
-            io.to(roomId).emit("owner-changed", {
-                owner: nextPlayer
-            });
-
-        } else {
-
-            rooms.delete(roomId);
-        }
-
-    } else if (room.players.size === 0) {
-
-        rooms.delete(roomId);
+        break;
+      }
     }
-
-    socket.data.roomId = null;
-
-    if (rooms.has(roomId)) {
-
-        io.to(roomId).emit("room-state", {
-            room: publicRoomInfo(room),
-            players: roomPlayerList(room)
-        });
-    }
-
-    broadcastRooms();
+    if (hit) bullets.splice(i, 1);
+  }
+  io.emit("state", buildState());
 }
+setInterval(tick, 1000 / 60);
 
-app.get("/api/rooms", (req, res) => {
-    res.json(visibleRooms());
-});
-
-app.get("*", (req, res) => {
-    res.sendFile(path.join(__dirname, "public", "index.html"));
-});
-
-server.listen(PORT, () => {
-    console.log(`🚀 Stellar Game lancé sur le port ${PORT}`);
-});
+// Render impose son propre PORT via process.env.PORT
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log(`✅ Serveur sur port ${PORT}`));
