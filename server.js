@@ -20,12 +20,11 @@ const MAX_HP = 100;
 const MAX_SHIELD = 100;
 const MAX_PLAYERS = 8;
 
-// ---------- Comptes actifs (pour lock multi-onglets) ----------
-const activeAccounts = {}; // pseudoLower -> { socketId, pseudoOriginal }
+// ---------- Comptes actifs ----------
+const activeAccounts = {};
 
 function broadcastLockedAccounts() {
-  const list = Object.values(activeAccounts).map(a => a.pseudoOriginal);
-  io.emit("locked-accounts", list);
+  io.emit("locked-accounts", Object.values(activeAccounts).map(a => a.pseudoOriginal));
 }
 
 // ---------- Rooms ----------
@@ -42,8 +41,8 @@ function genWall() {
   const w = 120 + Math.random() * 300;
   const h = 40 + Math.random() * 120;
   return {
-    x: 200 + Math.random() * (MAP_W - 600),
-    y: 200 + Math.random() * (MAP_H - 600),
+    x: 300 + Math.random() * (MAP_W - 800),
+    y: 300 + Math.random() * (MAP_H - 800),
     w, h
   };
 }
@@ -63,8 +62,8 @@ function genRiver() {
 }
 
 function genForest() {
-  const cx = 300 + Math.random() * (MAP_W - 600);
-  const cy = 300 + Math.random() * (MAP_H - 600);
+  const cx = 400 + Math.random() * (MAP_W - 800);
+  const cy = 400 + Math.random() * (MAP_H - 800);
   const trees = [];
   const count = 15 + Math.floor(Math.random() * 15);
   for (let i = 0; i < count; i++) {
@@ -106,6 +105,59 @@ function createRoom(name, hostId) {
   };
   rooms[id] = r;
   return r;
+}
+
+// ---------- Collisions ----------
+function isInsideWall(walls, x, y, r) {
+  for (const w of walls) {
+    if (x + r > w.x && x - r < w.x + w.w &&
+        y + r > w.y && y - r < w.y + w.h) return true;
+  }
+  return false;
+}
+
+function isInsideTree(forests, x, y, r) {
+  for (const f of forests) {
+    for (const t of f) {
+      if (Math.hypot(t.x - x, t.y - y) < t.r + r * 0.6) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Cherche une position libre proche de (preferX, preferY).
+ * Essaie en spirale de plus en plus loin. Renvoie toujours quelque chose.
+ */
+function findSafeSpawn(room, preferX, preferY) {
+  const md = room.mapData;
+  const margin = PLAYER_RADIUS + 40;
+
+  // On essaie la position préférée d'abord
+  const tryPos = (x, y) => {
+    if (x < margin || x > MAP_W - margin) return false;
+    if (y < margin || y > MAP_H - margin) return false;
+    if (isInsideWall(md.walls, x, y, PLAYER_RADIUS + 15)) return false;
+    if (isInsideTree(md.forests, x, y, PLAYER_RADIUS + 15)) return false;
+    return true;
+  };
+
+  if (tryPos(preferX, preferY)) return { x: preferX, y: preferY };
+
+  // Spirale de secours
+  for (let ring = 1; ring <= 40; ring++) {
+    const dist = ring * 60;
+    const count = 8 + ring * 2;
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2;
+      const x = preferX + Math.cos(a) * dist;
+      const y = preferY + Math.sin(a) * dist;
+      if (tryPos(x, y)) return { x, y };
+    }
+  }
+
+  // Dernier recours : centre de la carte
+  return { x: MAP_W / 2, y: MAP_H / 2 };
 }
 
 function publicPlayers(room) {
@@ -158,23 +210,6 @@ function roomList() {
   }));
 }
 
-function isInsideWall(walls, x, y, r) {
-  for (const w of walls) {
-    if (x + r > w.x && x - r < w.x + w.w &&
-        y + r > w.y && y - r < w.y + w.h) return true;
-  }
-  return false;
-}
-
-function isInsideTree(forests, x, y, r) {
-  for (const f of forests) {
-    for (const t of f) {
-      if (Math.hypot(t.x - x, t.y - y) < t.r + r * 0.6) return true;
-    }
-  }
-  return false;
-}
-
 function resetForGame(room) {
   room.bullets = [];
   room.mapData = generateMap();
@@ -184,9 +219,15 @@ function resetForGame(room) {
   ids.forEach((id, i) => {
     const p = room.players[id];
     const a = (i / ids.length) * Math.PI * 2;
-    p.x = MAP_W / 2 + Math.cos(a) * 400;
-    p.y = MAP_H / 2 + Math.sin(a) * 400;
+    const preferX = MAP_W / 2 + Math.cos(a) * 400;
+    const preferY = MAP_H / 2 + Math.sin(a) * 400;
+
+    // ✅ SPAWN SÉCURISÉ
+    const safe = findSafeSpawn(room, preferX, preferY);
+    p.x = safe.x;
+    p.y = safe.y;
     p.angle = a + Math.PI;
+
     p.hp = MAX_HP;
     p.shield = MAX_SHIELD;
     p.alive = true;
@@ -203,7 +244,7 @@ io.on("connection", socket => {
 
   socket.on("list-rooms", () => socket.emit("room-list-update", roomList()));
 
-  // ===== Comptes (lock multi-onglets) =====
+  // ===== Comptes =====
   socket.on("claim-account", pseudo => {
     const key = String(pseudo || "").toLowerCase();
     if (!key) return socket.emit("claim-result", { ok: false, reason: "pseudo invalide" });
@@ -354,6 +395,7 @@ io.on("connection", socket => {
     p.spectating = null;
   });
 
+  // ===== INPUT (mouvement) =====
   socket.on("input", data => {
     const room = rooms[currentRoom];
     if (!room) return;
@@ -378,9 +420,22 @@ io.on("connection", socket => {
 
     const md = room.mapData;
     if (md) {
-      if (!isInsideWall(md.walls, nx, p.y, PLAYER_RADIUS)) p.x = nx;
-      if (!isInsideWall(md.walls, p.x, ny, PLAYER_RADIUS) &&
-          !isInsideTree(md.forests, p.x, ny, PLAYER_RADIUS)) p.y = ny;
+      // ✅ MÉCANISME D'ÉVASION :
+      // Si le joueur est DÉJÀ dans un mur/arbre (spawn foireux, bug, etc.),
+      // on le laisse bouger librement pour qu'il puisse sortir.
+      const currentlyStuck =
+        isInsideWall(md.walls, p.x, p.y, PLAYER_RADIUS) ||
+        isInsideTree(md.forests, p.x, p.y, PLAYER_RADIUS);
+
+      if (currentlyStuck) {
+        p.x = nx;
+        p.y = ny;
+      } else {
+        // Comportement normal : on bloque le déplacement qui te mettrait dans un mur
+        if (!isInsideWall(md.walls, nx, p.y, PLAYER_RADIUS)) p.x = nx;
+        if (!isInsideWall(md.walls, p.x, ny, PLAYER_RADIUS) &&
+            !isInsideTree(md.forests, p.x, ny, PLAYER_RADIUS)) p.y = ny;
+      }
     } else {
       p.x = nx; p.y = ny;
     }
@@ -388,6 +443,7 @@ io.on("connection", socket => {
     if (typeof data.angle === "number") p.angle = data.angle;
   });
 
+  // ===== TIR =====
   socket.on("shoot", data => {
     const room = rooms[currentRoom];
     if (!room) return;
@@ -398,23 +454,31 @@ io.on("connection", socket => {
     p.lastShot = now;
     if (typeof data.angle === "number") p.angle = data.angle;
 
+    // ✅ On fait spawner la balle un peu plus loin si on est coincé
+    const md = room.mapData;
+    let offset = 34;
+    if (md) {
+      const stuck =
+        isInsideWall(md.walls, p.x, p.y, PLAYER_RADIUS) ||
+        isInsideTree(md.forests, p.x, p.y, PLAYER_RADIUS);
+      if (stuck) offset = 70; // départ hors du mur
+    }
+
     room.bullets.push({
       id: ++room.bulletSeq,
-      x: p.x + Math.cos(p.angle) * 34,
-      y: p.y + Math.sin(p.angle) * 34,
+      x: p.x + Math.cos(p.angle) * offset,
+      y: p.y + Math.sin(p.angle) * offset,
       vx: Math.cos(p.angle) * BULLET_SPEED,
       vy: Math.sin(p.angle) * BULLET_SPEED,
       owner: socket.id,
-      life: BULLET_LIFE
+      life: BULLET_LIFE,
+      ignoreWalls: 3 // ✅ GRACE PERIOD : ignore les murs pendant 3 ticks
     });
   });
 
   socket.on("disconnect", () => {
-    // Libère les comptes liés à ce socket
     for (const key in activeAccounts) {
-      if (activeAccounts[key].socketId === socket.id) {
-        delete activeAccounts[key];
-      }
+      if (activeAccounts[key].socketId === socket.id) delete activeAccounts[key];
     }
     broadcastLockedAccounts();
     if (currentRoom) handleLeave(currentRoom, socket.id);
@@ -456,14 +520,27 @@ function tick() {
     // Balles
     for (let i = room.bullets.length - 1; i >= 0; i--) {
       const b = room.bullets[i];
-      b.x += b.vx; b.y += b.vy; b.life--;
+      b.x += b.vx;
+      b.y += b.vy;
+      b.life--;
+
+      // ✅ Grace period : les premières frames on ignore les murs
+      if (b.ignoreWalls && b.ignoreWalls > 0) {
+        b.ignoreWalls--;
+      }
 
       let dead = false;
       if (b.life <= 0 || b.x < 0 || b.x > MAP_W || b.y < 0 || b.y > MAP_H) dead = true;
-      if (!dead && room.mapData && isInsideWall(room.mapData.walls, b.x, b.y, 4)) dead = true;
+
+      // Collision mur (seulement après la grace period)
+      if (!dead && !b.ignoreWalls && room.mapData &&
+          isInsideWall(room.mapData.walls, b.x, b.y, 4)) {
+        dead = true;
+      }
 
       if (dead) { room.bullets.splice(i, 1); continue; }
 
+      // Collision joueur
       let hit = false;
       for (const id in room.players) {
         if (id === b.owner) continue;
@@ -472,7 +549,6 @@ function tick() {
         if (Math.hypot(p.x - b.x, p.y - b.y) < PLAYER_RADIUS) {
           let dmg = BULLET_DAMAGE;
 
-          // Bouclier absorbe d'abord
           if (p.shield > 0) {
             const absorbed = Math.min(p.shield, dmg);
             p.shield -= absorbed;
@@ -491,7 +567,7 @@ function tick() {
       if (hit) room.bullets.splice(i, 1);
     }
 
-    // ===== Détection victoire =====
+    // Victoire
     const aliveIds = Object.keys(room.players).filter(id => room.players[id].alive);
     const totalPlayers = Object.keys(room.players).length;
 
