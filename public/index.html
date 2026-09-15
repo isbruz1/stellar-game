@@ -10,35 +10,110 @@
 
 <!-- ==================== SPLASH ==================== -->
 <div id="splashScreen" class="screen splash-screen">
-  <canvas id="splashCanvas"></canvas>
+  <canvas id="galaxyCanvas"></canvas>
+  <div class="splash-overlay"></div>
   <div class="splash-content">
-    <img src="assets/stellar.png" alt="Stellar Game" class="splash-logo">
-    <div class="splash-tagline">PRÉPARATION DU DÉCOLLAGE…</div>
-    <div class="splash-loader">
-      <div class="splash-loader-bar"></div>
+    <div class="splash-logo-wrap">
+      <div class="splash-ring"></div>
+      <div class="splash-ring splash-ring-2"></div>
+      <img src="assets/stellar.png" alt="Stellar Game" class="splash-logo">
     </div>
+    <div class="splash-title">STELLAR&nbsp;GAME</div>
+    <div class="splash-tagline">DÉCOLLAGE IMMINENT</div>
+    <div class="splash-loader"><div class="splash-loader-bar"></div></div>
+    <div class="splash-version">v1.0 — GALAXY EDITION</div>
   </div>
 </div>
 
 <!-- ==================== LOGIN ==================== -->
 <div id="loginScreen" class="screen login-screen hidden">
-  <div class="stars"></div>
+  <canvas id="loginCanvas"></canvas>
   <div class="login-box">
+    <div class="login-glow"></div>
     <img src="assets/stellar.png" alt="Stellar Game" class="login-logo">
+    <h1>IDENTIFICATION</h1>
+    <p class="login-sub">Crée ton profil de pilote</p>
 
-    <h1>CRÉE TON PROFIL</h1>
-    <p class="login-sub">Rejoins le salon principal</p>
-
-    <label for="pseudoInput">Pseudo</label>
+    <label for="pseudoInput">Pseudo (5 car. min.)</label>
     <input id="pseudoInput" type="text" maxlength="16"
-           placeholder="5 caractères minimum" autocomplete="off" spellcheck="false">
+           placeholder="Ton pseudo de pilote" autocomplete="off" spellcheck="false">
     <div id="pseudoError" class="error-msg"></div>
 
     <label for="realNameInput">Nom réel</label>
     <input id="realNameInput" type="text" maxlength="32"
-           placeholder="Ton nom" autocomplete="off" spellcheck="false">
+           placeholder="Ton vrai nom" autocomplete="off" spellcheck="false">
 
-    <button id="loginBtn" class="btn btn-green" disabled>DÉCOLLER 🚀</button>
+    <button id="loginBtn" class="btn btn-green" disabled>CONTINUER 🚀</button>
+  </div>
+</div>
+
+<!-- ==================== MAIN MENU ==================== -->
+<div id="mainMenuScreen" class="screen main-menu-screen hidden">
+  <canvas id="menuCanvas"></canvas>
+
+  <div class="top-bar">
+    <div class="logo">
+      <img src="assets/stellar.png" class="logo-img">
+      <span>STELLAR GAME</span>
+    </div>
+    <div class="top-actions">
+      <div class="user-chip">
+        <span id="userPseudo">—</span>
+        <span id="userReal" class="user-real">—</span>
+      </div>
+      <button id="settingsBtn" class="icon-btn" title="Paramètres">⚙️</button>
+    </div>
+  </div>
+
+  <div class="menu-content">
+    <h1 class="menu-title">PRÊT POUR LE DÉCOLLAGE ?</h1>
+    <p class="menu-sub">Rejoins une partie ou crée ton propre serveur</p>
+    <button id="playBtn" class="btn btn-green btn-huge">JOUER</button>
+  </div>
+
+  <div class="menu-footer">
+    <span id="onlineCount">0 serveur actif</span>
+  </div>
+</div>
+
+<!-- ==================== SERVER BROWSER ==================== -->
+<div id="serverBrowser" class="screen hidden">
+  <div class="browser-header">
+    <button id="closeBrowser" class="icon-btn">←</button>
+    <h2>NAVIGATEUR DE SERVEURS</h2>
+    <div style="width:44px"></div>
+  </div>
+
+  <div class="browser-tabs">
+    <button class="tab-btn active" data-tab="join">REJOINDRE</button>
+    <button class="tab-btn" data-tab="create">CRÉER</button>
+  </div>
+
+  <!-- Rejoindre -->
+  <div id="tab-join" class="tab-panel">
+    <div class="join-by-code">
+      <input id="codeInput" type="text" maxlength="5"
+             placeholder="CODE (ex: A4F9K)" autocomplete="off" spellcheck="false">
+      <button id="joinByCodeBtn" class="btn btn-green small">REJOINDRE</button>
+    </div>
+
+    <div class="refresh-row">
+      <button id="refreshRooms" class="btn-refresh">🔄 Rafraîchir</button>
+      <span id="roomsCount" class="muted">— serveurs disponibles</span>
+    </div>
+
+    <div id="roomsList" class="rooms-list"></div>
+  </div>
+
+  <!-- Créer -->
+  <div id="tab-create" class="tab-panel hidden">
+    <div class="create-form">
+      <label>Nom du serveur</label>
+      <input id="serverNameInput" type="text" maxlength="24"
+             placeholder="Mon serveur" autocomplete="off">
+      <button id="createRoomBtn" class="btn btn-green">CRÉER LE SERVEUR</button>
+      <p class="muted small">Un code à 5 caractères sera généré automatiquement.</p>
+    </div>
   </div>
 </div>
 
@@ -49,11 +124,16 @@
       <img src="assets/stellar.png" class="logo-img">
       <span>STELLAR GAME</span>
     </div>
-    <button id="settingsBtn" class="icon-btn" title="Paramètres">⚙️</button>
+    <div class="top-actions">
+      <div class="room-code-chip">
+        CODE : <strong id="roomCodeDisplay">—</strong>
+      </div>
+      <button id="settingsBtn2" class="icon-btn" title="Paramètres">⚙️</button>
+    </div>
   </div>
 
   <div class="lobby-content">
-    <h2>SALON PRINCIPAL <span id="playerCount">(0)</span></h2>
+    <h2>SALON <span id="playerCount">(0)</span> <span id="roomNameDisplay" class="room-name"></span></h2>
     <div class="players-grid" id="playersGrid"></div>
   </div>
 
@@ -69,6 +149,7 @@
   <div id="hud">
     <button id="leaveGameBtn" class="icon-btn" title="Retour au salon">←</button>
     <div id="scoreboard"></div>
+    <div id="zoneIndicator"></div>
   </div>
 </div>
 
