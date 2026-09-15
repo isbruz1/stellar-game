@@ -1,5 +1,5 @@
 /* ==================================================================
-   STELLAR GAME — Client V4
+   STELLAR GAME — Client V5
    ================================================================== */
 
 // ---------- Accounts ----------
@@ -12,7 +12,7 @@ function saveAccounts(a) { localStorage.setItem("accounts", JSON.stringify(a)); 
 let accounts = loadAccounts();
 let currentAccount = null;
 let selectedAccountIdx = -1;
-let tempSkin = 0; // skin en cours de création
+let tempSkin = 0;
 
 // ---------- Runtime ----------
 let myId = null, hostId = null, currentRoomId = null;
@@ -22,7 +22,13 @@ let myAngle = 0;
 let dead = false, spectating = null;
 const keys = { up: false, down: false, left: false, right: false };
 let socket = null;
-let lockedAccounts = []; // pseudos verrouillés
+let lockedAccounts = [];
+
+// Damage numbers & effects
+let damageNumbers = [];
+let shieldBreakFx = [];
+let shakeTime = 0;
+let shakeIntensity = 0;
 
 // ---------- DOM ----------
 const $ = id => document.getElementById(id);
@@ -101,7 +107,7 @@ function showScreen(name) {
 }
 
 // ==================================================================
-//  SOCKET — connexion dès le chargement (pour recevoir locked-accounts)
+//  SOCKET
 // ==================================================================
 function connectSocket() {
   if (socket) return;
@@ -114,18 +120,14 @@ function connectSocket() {
 
   socket.on("locked-accounts", list => {
     lockedAccounts = list || [];
-    if (!profilesScreen.classList.contains("hidden")) {
-      renderAccounts();
-    }
+    if (!profilesScreen.classList.contains("hidden")) renderAccounts();
   });
 
   socket.on("claim-result", res => {
     if (res.ok) {
-      // Connecté OK avec ce compte
       enterMenuWithAccount();
     } else {
       alert("❌ " + res.reason);
-      // On retourne à l'écran profils
       releaseAccount();
       showScreen("profiles");
       renderAccounts();
@@ -180,6 +182,9 @@ function connectSocket() {
   socket.on("game-started", () => {
     gameStarted = true;
     dead = false;
+    damageNumbers = [];
+    shieldBreakFx = [];
+    shakeTime = 0;
     showScreen("game");
     $("deathScreen").classList.add("hidden");
     $("spectatePanel").classList.add("hidden");
@@ -200,16 +205,53 @@ function connectSocket() {
     }
   });
 
+  // ===== DAMAGE NUMBERS =====
+  socket.on("hit", data => {
+    if (data.shieldDamage > 0) {
+      damageNumbers.push({
+        x: data.x + (Math.random() - 0.5) * 30,
+        y: data.y - 30,
+        value: Math.round(data.shieldDamage),
+        color: "#4af",
+        life: 60,
+        vy: -1.2
+      });
+    }
+    if (data.hpDamage > 0) {
+      damageNumbers.push({
+        x: data.x + (Math.random() - 0.5) * 30,
+        y: data.y - 50,
+        value: Math.round(data.hpDamage),
+        color: "#fff",
+        life: 60,
+        vy: -1.4
+      });
+    }
+  });
+
+  // ===== BOUCLIER DÉTRUIT =====
+  socket.on("shield-broken", data => {
+    shieldBreakFx.push({
+      x: data.x,
+      y: data.y,
+      life: 50
+    });
+  });
+
+  // ===== SCREEN SHAKE =====
+  socket.on("screen-shake", () => {
+    shakeTime = 30;
+    shakeIntensity = 14;
+  });
+
   socket.on("state", s => {
     serverState = s;
     const me = s.players[myId];
     if (!me) return;
 
-    // Barres HP/shield
     hpBar.style.width = (me.hp / 100 * 100) + "%";
     shieldBar.style.width = (me.shield / 100 * 100) + "%";
 
-    // Détection mort
     if (!me.alive && !dead && gameStarted) {
       dead = true;
       $("deathScreen").classList.remove("hidden");
@@ -259,7 +301,7 @@ function initStarfield(canvasId, opacity = 0.5) {
 }
 
 // ==================================================================
-//  SPLASH GALAXY — visible par TOUT LE MONDE
+//  SPLASH GALAXY
 // ==================================================================
 (function initGalaxy() {
   const c = $("galaxyCanvas");
@@ -367,7 +409,6 @@ function renderAccounts() {
     r.textContent = acc.realName || "";
     card.appendChild(r);
 
-    // Bouton supprimer
     const del = document.createElement("button");
     del.className = "delete-btn";
     del.textContent = "✕";
@@ -384,7 +425,6 @@ function renderAccounts() {
     });
     card.appendChild(del);
 
-    // Clic sur la carte
     card.addEventListener("click", () => {
       if (locked) return;
       selectedAccountIdx = idx;
@@ -395,11 +435,9 @@ function renderAccounts() {
     accountList.appendChild(card);
   });
 
-  // Sélectionne le premier compte non-locked par défaut
   if (selectedAccountIdx < 0 || selectedAccountIdx >= accounts.length ||
       isAccountLocked(accounts[selectedAccountIdx]?.pseudo || "")) {
-    const firstOk = accounts.findIndex(a => !isAccountLocked(a.pseudo));
-    selectedAccountIdx = firstOk;
+    selectedAccountIdx = accounts.findIndex(a => !isAccountLocked(a.pseudo));
   }
 
   if (selectedAccountIdx >= 0 && accounts[selectedAccountIdx]) {
@@ -417,7 +455,6 @@ function previewAccount(acc) {
   previewReal.textContent = acc.realName || "";
   drawPreviewTank(acc.skin || 0);
 
-  // Skin picker inline
   previewSkinPicker.innerHTML = "";
   SKINS.forEach((s, i) => {
     const c = document.createElement("canvas");
@@ -449,9 +486,6 @@ function drawPreviewTank(skinId) {
   cx.restore();
 }
 
-// ==================================================================
-//  ENTRER DANS LE MENU
-// ==================================================================
 function enterMenuWithAccount() {
   userPseudoEl.textContent = currentAccount.pseudo;
   userRealEl.textContent = currentAccount.realName;
@@ -468,7 +502,7 @@ enterLobbyBtn.addEventListener("click", () => {
 });
 
 // ==================================================================
-//  NOUVEAU COMPTE — étape 1 : pseudo + nom
+//  NOUVEAU COMPTE
 // ==================================================================
 newAccountBtn.addEventListener("click", () => {
   pseudoInput.value = "";
@@ -507,9 +541,6 @@ nextToSkinBtn.addEventListener("click", () => {
   buildSkinGrid();
 });
 
-// ==================================================================
-//  NOUVEAU COMPTE — étape 2 : skin
-// ==================================================================
 function buildSkinGrid() {
   skinGrid.innerHTML = "";
   SKINS.forEach((s, i) => {
@@ -749,7 +780,7 @@ function renderSpectateList() {
     if (!p.alive || p.id === myId) return;
     const el = document.createElement("div");
     el.className = "spectate-item" + (spectating === p.id ? " active" : "");
-    el.textContent = `${p.pseudo}`;
+    el.textContent = p.pseudo;
     el.addEventListener("click", () => {
       if (socket) socket.emit("spectate", p.id);
       spectating = p.id;
@@ -760,7 +791,7 @@ function renderSpectateList() {
 }
 
 // ==================================================================
-//  VICTORY SCREEN
+//  VICTORY
 // ==================================================================
 $("returnToServerBtn").addEventListener("click", () => {
   $("victoryScreen").classList.add("hidden");
@@ -836,7 +867,17 @@ resizeCanvas();
 function getCamera() {
   const target = spectating ? serverState.players[spectating] : serverState.players[myId];
   if (!target) return { x: 0, y: 0 };
-  return { x: target.x - canvas.width / 2, y: target.y - canvas.height / 2 };
+  let cx = target.x - canvas.width / 2;
+  let cy = target.y - canvas.height / 2;
+
+  // Tremblement d'écran
+  if (shakeTime > 0) {
+    const intensity = shakeIntensity * (shakeTime / 30);
+    cx += (Math.random() - 0.5) * intensity;
+    cy += (Math.random() - 0.5) * intensity;
+  }
+
+  return { x: cx, y: cy };
 }
 
 // ==================================================================
@@ -853,8 +894,7 @@ function drawRivers() {
   const cam = getCamera();
   const time = Date.now() / 1000;
 
-  md.rivers.forEach((r, rIdx) => {
-    // Berges
+  md.rivers.forEach(r => {
     ctx.strokeStyle = "rgba(40, 30, 15, 0.8)";
     ctx.lineWidth = r.width + 24;
     ctx.lineCap = "round"; ctx.lineJoin = "round";
@@ -865,12 +905,10 @@ function drawRivers() {
     });
     ctx.stroke();
 
-    // Herbe/sable
     ctx.strokeStyle = "rgba(70, 90, 40, 0.5)";
     ctx.lineWidth = r.width + 12;
     ctx.stroke();
 
-    // Eau
     ctx.strokeStyle = "rgba(15, 45, 100, 0.95)";
     ctx.lineWidth = r.width;
     ctx.beginPath();
@@ -880,12 +918,10 @@ function drawRivers() {
     });
     ctx.stroke();
 
-    // Eau claire
     ctx.strokeStyle = "rgba(30, 80, 150, 0.7)";
     ctx.lineWidth = r.width * 0.7;
     ctx.stroke();
 
-    // Reflets animés
     ctx.strokeStyle = `rgba(120, 200, 255, ${0.4 + Math.sin(time * 1.5) * 0.15})`;
     ctx.lineWidth = r.width * 0.45;
     ctx.setLineDash([18, 28]);
@@ -913,33 +949,25 @@ function drawForests() {
 
       const sway = Math.sin(time * 1.2 + idx * 0.7) * 2.5;
 
-      // Ombre
       ctx.fillStyle = "rgba(0,0,0,0.45)";
       ctx.beginPath();
       ctx.ellipse(x + 6, y + t.r * 0.6, t.r * 0.95, t.r * 0.4, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // Tronc
       ctx.fillStyle = "#2a1808";
       ctx.fillRect(x - 5, y + t.r * 0.1, 10, t.r * 0.7);
       ctx.fillStyle = "#5a3a1a";
       ctx.fillRect(x - 5, y + t.r * 0.1, 4, t.r * 0.7);
 
-      // Feuillages
       ctx.fillStyle = "#0a1f0a";
-      ctx.beginPath();
-      ctx.arc(x + sway * 0.3, y + t.r * 0.1, t.r, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x + sway * 0.3, y + t.r * 0.1, t.r, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = "#1a3a1a";
-      ctx.beginPath();
-      ctx.arc(x - 2 + sway * 0.5, y - t.r * 0.15, t.r * 0.85, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x - 2 + sway * 0.5, y - t.r * 0.15, t.r * 0.85, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = "#2d5a28";
-      ctx.beginPath();
-      ctx.arc(x - 4 + sway * 0.7, y - t.r * 0.35, t.r * 0.6, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x - 4 + sway * 0.7, y - t.r * 0.35, t.r * 0.6, 0, Math.PI * 2); ctx.fill();
 
-      // Highlight
       ctx.fillStyle = "rgba(150, 220, 150, 0.4)";
-      ctx.beginPath();
-      ctx.arc(x - 7 + sway * 0.8, y - t.r * 0.5, t.r * 0.28, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x - 7 + sway * 0.8, y - t.r * 0.5, t.r * 0.28, 0, Math.PI * 2); ctx.fill();
     });
   });
 }
@@ -996,7 +1024,6 @@ function drawPlayer(p, isMe) {
   ctx.ellipse(x, y + 6, 32, 12, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Bouclier visuel discret
   if (p.shield > 0) {
     ctx.strokeStyle = `rgba(255,221,68,${0.3 + (p.shield / 100) * 0.5})`;
     ctx.lineWidth = 3;
@@ -1010,7 +1037,6 @@ function drawPlayer(p, isMe) {
   drawTankShape(ctx, p.skin, p.angle);
   ctx.restore();
 
-  // Pseudo (pas de HP affiché)
   ctx.fillStyle = isMe ? "#4af" : "#fff";
   ctx.font = "bold 13px Segoe UI, Arial";
   ctx.textAlign = "center";
@@ -1030,6 +1056,88 @@ function drawBullets() {
   ctx.shadowBlur = 0;
 }
 
+function updateDamageNumbers() {
+  for (let i = damageNumbers.length - 1; i >= 0; i--) {
+    const dn = damageNumbers[i];
+    dn.y += dn.vy;
+    dn.vy *= 0.96;
+    dn.life--;
+    if (dn.life <= 0) damageNumbers.splice(i, 1);
+  }
+}
+
+function drawDamageNumbers() {
+  const cam = getCamera();
+  damageNumbers.forEach(dn => {
+    const x = dn.x - cam.x;
+    const y = dn.y - cam.y;
+    const alpha = Math.min(1, dn.life / 30);
+
+    ctx.font = "bold 22px Segoe UI, Arial";
+    ctx.textAlign = "center";
+
+    ctx.fillStyle = `rgba(0,0,0,${alpha * 0.7})`;
+    ctx.fillText("-" + dn.value, x + 2, y + 2);
+
+    ctx.fillStyle = dn.color;
+    ctx.globalAlpha = alpha;
+    ctx.fillText("-" + dn.value, x, y);
+    ctx.globalAlpha = 1;
+  });
+}
+
+function updateShieldBreakFx() {
+  for (let i = shieldBreakFx.length - 1; i >= 0; i--) {
+    shieldBreakFx[i].life--;
+    if (shieldBreakFx[i].life <= 0) shieldBreakFx.splice(i, 1);
+  }
+}
+
+function drawShieldBreakFx() {
+  const cam = getCamera();
+  shieldBreakFx.forEach(fx => {
+    const x = fx.x - cam.x;
+    const y = fx.y - cam.y;
+    const progress = 1 - fx.life / 50;
+    const alpha = Math.min(1, fx.life / 25);
+    const radius = 30 + progress * 70;
+
+    ctx.strokeStyle = `rgba(255, 221, 68, ${alpha})`;
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = `rgba(255, 200, 0, ${alpha * 0.6})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(x, y, radius * 0.7, 0, Math.PI * 2);
+    ctx.stroke();
+
+    if (fx.life > 20) {
+      const textAlpha = (fx.life - 20) / 30;
+      ctx.font = "bold 16px Segoe UI, Arial";
+      ctx.textAlign = "center";
+      ctx.fillStyle = `rgba(0,0,0,${textAlpha * 0.7})`;
+      ctx.fillText("BOUCLIER DÉTRUIT !", x + 2, y - radius - 8);
+      ctx.fillStyle = `rgba(255, 221, 68, ${textAlpha})`;
+      ctx.fillText("BOUCLIER DÉTRUIT !", x, y - radius - 10);
+    }
+
+    const shardCount = 6;
+    for (let i = 0; i < shardCount; i++) {
+      const a = (i / shardCount) * Math.PI * 2 + progress * 3;
+      const sd = radius * 0.9;
+      const sx = x + Math.cos(a) * sd;
+      const sy = y + Math.sin(a) * sd;
+      ctx.fillStyle = `rgba(255, 221, 68, ${alpha})`;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  });
+}
+
 function drawScoreboard() {
   const el = $("scoreboard");
   const list = Object.values(serverState.players);
@@ -1046,7 +1154,6 @@ function drawMinimap() {
   mmCtx.fillStyle = "rgba(10, 20, 40, 0.9)";
   mmCtx.fillRect(0, 0, size, size);
 
-  // Murs (fond de carte)
   if (serverState.mapData) {
     mmCtx.fillStyle = "rgba(150, 150, 180, 0.4)";
     serverState.mapData.walls.forEach(w => {
@@ -1063,7 +1170,6 @@ function drawMinimap() {
     });
   }
 
-  // UNIQUEMENT moi
   const me = serverState.players[myId];
   if (me && me.alive) {
     mmCtx.fillStyle = "#4af";
@@ -1085,12 +1191,21 @@ function loop() {
     drawGrid();
     drawWalls();
     drawForests();
+
     Object.values(serverState.players).forEach(p => {
       if (p.alive) drawPlayer(p, p.id === myId);
     });
+
     drawBullets();
+    drawShieldBreakFx();
+    drawDamageNumbers();
+
     drawScoreboard();
     drawMinimap();
+
+    updateDamageNumbers();
+    updateShieldBreakFx();
+    if (shakeTime > 0) shakeTime--;
   }
   requestAnimationFrame(loop);
 }

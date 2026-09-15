@@ -125,15 +125,10 @@ function isInsideTree(forests, x, y, r) {
   return false;
 }
 
-/**
- * Cherche une position libre proche de (preferX, preferY).
- * Essaie en spirale de plus en plus loin. Renvoie toujours quelque chose.
- */
 function findSafeSpawn(room, preferX, preferY) {
   const md = room.mapData;
   const margin = PLAYER_RADIUS + 40;
 
-  // On essaie la position préférée d'abord
   const tryPos = (x, y) => {
     if (x < margin || x > MAP_W - margin) return false;
     if (y < margin || y > MAP_H - margin) return false;
@@ -144,7 +139,6 @@ function findSafeSpawn(room, preferX, preferY) {
 
   if (tryPos(preferX, preferY)) return { x: preferX, y: preferY };
 
-  // Spirale de secours
   for (let ring = 1; ring <= 40; ring++) {
     const dist = ring * 60;
     const count = 8 + ring * 2;
@@ -155,8 +149,6 @@ function findSafeSpawn(room, preferX, preferY) {
       if (tryPos(x, y)) return { x, y };
     }
   }
-
-  // Dernier recours : centre de la carte
   return { x: MAP_W / 2, y: MAP_H / 2 };
 }
 
@@ -222,7 +214,6 @@ function resetForGame(room) {
     const preferX = MAP_W / 2 + Math.cos(a) * 400;
     const preferY = MAP_H / 2 + Math.sin(a) * 400;
 
-    // ✅ SPAWN SÉCURISÉ
     const safe = findSafeSpawn(room, preferX, preferY);
     p.x = safe.x;
     p.y = safe.y;
@@ -395,7 +386,7 @@ io.on("connection", socket => {
     p.spectating = null;
   });
 
-  // ===== INPUT (mouvement) =====
+  // ===== INPUT =====
   socket.on("input", data => {
     const room = rooms[currentRoom];
     if (!room) return;
@@ -420,9 +411,6 @@ io.on("connection", socket => {
 
     const md = room.mapData;
     if (md) {
-      // ✅ MÉCANISME D'ÉVASION :
-      // Si le joueur est DÉJÀ dans un mur/arbre (spawn foireux, bug, etc.),
-      // on le laisse bouger librement pour qu'il puisse sortir.
       const currentlyStuck =
         isInsideWall(md.walls, p.x, p.y, PLAYER_RADIUS) ||
         isInsideTree(md.forests, p.x, p.y, PLAYER_RADIUS);
@@ -431,7 +419,6 @@ io.on("connection", socket => {
         p.x = nx;
         p.y = ny;
       } else {
-        // Comportement normal : on bloque le déplacement qui te mettrait dans un mur
         if (!isInsideWall(md.walls, nx, p.y, PLAYER_RADIUS)) p.x = nx;
         if (!isInsideWall(md.walls, p.x, ny, PLAYER_RADIUS) &&
             !isInsideTree(md.forests, p.x, ny, PLAYER_RADIUS)) p.y = ny;
@@ -454,14 +441,13 @@ io.on("connection", socket => {
     p.lastShot = now;
     if (typeof data.angle === "number") p.angle = data.angle;
 
-    // ✅ On fait spawner la balle un peu plus loin si on est coincé
     const md = room.mapData;
     let offset = 34;
     if (md) {
       const stuck =
         isInsideWall(md.walls, p.x, p.y, PLAYER_RADIUS) ||
         isInsideTree(md.forests, p.x, p.y, PLAYER_RADIUS);
-      if (stuck) offset = 70; // départ hors du mur
+      if (stuck) offset = 70;
     }
 
     room.bullets.push({
@@ -472,7 +458,7 @@ io.on("connection", socket => {
       vy: Math.sin(p.angle) * BULLET_SPEED,
       owner: socket.id,
       life: BULLET_LIFE,
-      ignoreWalls: 3 // ✅ GRACE PERIOD : ignore les murs pendant 3 ticks
+      ignoreWalls: 3
     });
   });
 
@@ -524,15 +510,11 @@ function tick() {
       b.y += b.vy;
       b.life--;
 
-      // ✅ Grace period : les premières frames on ignore les murs
-      if (b.ignoreWalls && b.ignoreWalls > 0) {
-        b.ignoreWalls--;
-      }
+      if (b.ignoreWalls && b.ignoreWalls > 0) b.ignoreWalls--;
 
       let dead = false;
       if (b.life <= 0 || b.x < 0 || b.x > MAP_W || b.y < 0 || b.y > MAP_H) dead = true;
 
-      // Collision mur (seulement après la grace period)
       if (!dead && !b.ignoreWalls && room.mapData &&
           isInsideWall(room.mapData.walls, b.x, b.y, 4)) {
         dead = true;
@@ -548,15 +530,47 @@ function tick() {
         if (!p.alive) continue;
         if (Math.hypot(p.x - b.x, p.y - b.y) < PLAYER_RADIUS) {
           let dmg = BULLET_DAMAGE;
+          let shieldDamage = 0;
+          let hpDamage = 0;
+          let shieldBroken = false;
 
+          // Bouclier absorbe d'abord
           if (p.shield > 0) {
             const absorbed = Math.min(p.shield, dmg);
             p.shield -= absorbed;
+            shieldDamage = absorbed;
             dmg -= absorbed;
+            if (p.shield <= 0 && absorbed > 0) shieldBroken = true;
           }
-          if (dmg > 0) p.hp -= dmg;
+          if (dmg > 0) {
+            p.hp -= dmg;
+            hpDamage = dmg;
+          }
 
           hit = true;
+
+          // Événement hit (chiffres flottants)
+          io.to(room.id).emit("hit", {
+            targetId: id,
+            attackerId: b.owner,
+            x: p.x,
+            y: p.y,
+            shieldDamage,
+            hpDamage,
+            shieldBroken
+          });
+
+          // Bouclier cassé → animation + shake
+          if (shieldBroken) {
+            io.to(room.id).emit("shield-broken", {
+              targetId: id,
+              x: p.x,
+              y: p.y
+            });
+            const victimSocket = io.sockets.sockets.get(id);
+            if (victimSocket) victimSocket.emit("screen-shake");
+          }
+
           if (p.hp <= 0) {
             p.hp = 0;
             p.alive = false;
