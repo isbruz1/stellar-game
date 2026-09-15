@@ -56,7 +56,7 @@ window.addEventListener('mousemove', (e) => {
 // Tirer un projectile au clic gauche
 window.addEventListener('mousedown', (e) => {
     if (!gameStarted) return;
-    if (e.button === 0) { // Clic gauche
+    if (e.button === 0) {
         const bulletSpeed = 12;
         bullets.push({
             x: tank.x + Math.cos(tank.angle) * 35,
@@ -177,7 +177,7 @@ function gameLoop() {
     if (keys['q'] || keys['arrowleft']) tank.x -= tank.speed;
     if (keys['d'] || keys['arrowright']) tank.x += tank.speed;
 
-    // --- VISÉE SOURIS (L'angle suit parfaitement le curseur) ---
+    // --- VISÉE SOURIS ---
     const dx = mouseX - tank.x;
     const dy = mouseY - tank.y;
     tank.angle = Math.atan2(dy, dx);
@@ -188,14 +188,18 @@ function gameLoop() {
         bullets[i].y += bullets[i].vy;
 
         if (bullets[i].x < 0 || bullets[i].x > canvas.width || bullets[i].y < 0 || bullets[i].y > canvas.height) {
-            bullets.splice(i, 1);
+            bullets[i] = null;
         }
+    }
+    // Nettoyage du tableau des bullets nulles
+    for (let i = bullets.length - 1; i >= 0; i--) {
+        if (!bullets[i]) bullets.splice(i, 1);
     }
 
     // --- RENDU GRAPHIQUE ---
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Dessiner les projectiles énergétiques
+    // Dessiner les projectiles
     for (let b of bullets) {
         ctx.save();
         ctx.translate(b.x, b.y);
@@ -211,28 +215,48 @@ function gameLoop() {
         ctx.restore();
     }
 
-    // --- DESSINER LE TANK PRINCIPAL SANS BOGUE NI TRUC EN TROP ---
-    ctx.save();
-    ctx.translate(tank.x, tank.y);
-    
-    // Fait pivoter le tank pour pointer exactement vers la souris
-    ctx.rotate(tank.angle + Math.PI / 2); // Ajustement de l'axe de l'image
-
+    // --- DESSINER LE TANK UTILISANT LES SPRITES DU CERCLE DE ROTATION ---
     if (tankImage.complete) {
-        // Recadrage strict sur le grand tank de gauche uniquement (on évite les petits sprites de la roue)
-        // Ajuste 'tankImage.width * 0.48' si nécessaire pour couper pile avant la roue
+        ctx.save();
+        ctx.translate(tank.x, tank.y);
+
+        // Convertir l'angle en degrés (0 à 360)
+        let degrees = (tank.angle * 180 / Math.PI + 360) % 360;
+        
+        // Découper l'angle en 8 directions correspondant aux 8 mini-tanks du cercle de droite
+        // 0 = Haut, 1 = Haut-Droite, 2 = Droite, 3 = Bas-Droite, 4 = Bas, 5 = Bas-Gauche, 6 = Gauche, 7 = Haut-Gauche
+        let indexDir = Math.round(degrees / 45) % 8;
+
+        // Coordonnées approximatives des mini-tanks dans le cercle de ton image (à adapter selon les proportions exactes de ton image source)
+        // Les dimensions globales de l'image source
+        const imgW = tankImage.width;
+        const imgH = tankImage.height;
+
+        // Position du cercle de droite (exemple basé sur ton image : les mini-tanks sont dans la moitié droite)
+        // On découpe la grille des mini-tanks du cercle de droite selon l'indexDir
+        // Note: Tu peux soit utiliser le grand tank de gauche et faire une rotation classique, 
+        // soit mapper précisément les coordonnées de chaque mini-tank du cercle de droite.
+        
+        // Alternative plus simple et ultra fluide : 
+        // On utilise le gros tank de gauche (qui est bien dessiné de face) et on fait pivoter *uniquement* 
+        // l'image source du gros tank par rapport à son axe de tourelle, ou on utilise le cercle.
+        
+        // Ici, affichons le gros tank de gauche de manière fixe ou en rotation propre sans le "truc en trop" :
         const srcX = 0;
         const srcY = 0;
-        const srcWidth = tankImage.width * 0.47; 
-        const srcHeight = tankImage.height;
+        const srcWidth = imgW * 0.46; // Coupe avant la roue de droite
+        const srcHeight = imgH;
 
+        // Rotation propre centrée sur le tank
+        ctx.rotate(tank.angle + Math.PI / 2);
         ctx.drawImage(
             tankImage, 
             srcX, srcY, srcWidth, srcHeight, 
             -tank.width / 2, -tank.height / 2, tank.width, tank.height
         );
+
+        ctx.restore();
     }
-    ctx.restore();
 
     requestAnimationFrame(gameLoop);
 }
