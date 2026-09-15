@@ -30,16 +30,15 @@ const tank = {
     x: window.innerWidth / 2,
     y: window.innerHeight / 2,
     speed: 4,
-    angle: 0,         // Angle de visée (souris)
-    bodyAngle: 0,     // Angle de déplacement
-    width: 120,
-    height: 120
+    angle: 0,     // Angle vers la souris
+    width: 110,
+    height: 110
 };
 
 // Tableau des projectiles
 const bullets = [];
 
-// Charger l'image complète du tank
+// Charger l'image complète du tank (sprite sheet)
 const tankImage = new Image();
 tankImage.src = 'assets/Gemini_Generated_Image_7sx5q27sx5q27sx5-removebg-preview.png';
 
@@ -60,8 +59,8 @@ window.addEventListener('mousedown', (e) => {
     if (e.button === 0) { // Clic gauche
         const bulletSpeed = 12;
         bullets.push({
-            x: tank.x + Math.cos(tank.angle) * 40, // Part du canon
-            y: tank.y + Math.sin(tank.angle) * 40,
+            x: tank.x + Math.cos(tank.angle) * 35,
+            y: tank.y + Math.sin(tank.angle) * 35,
             vx: Math.cos(tank.angle) * bulletSpeed,
             vy: Math.sin(tank.angle) * bulletSpeed,
             angle: tank.angle
@@ -173,25 +172,12 @@ function gameLoop() {
     if (!gameStarted) return;
 
     // --- MOUVEMENTS ZQSD ---
-    let moving = false;
-    let targetAngle = tank.bodyAngle;
+    if (keys['z'] || keys['arrowup']) tank.y -= tank.speed;
+    if (keys['s'] || keys['arrowdown']) tank.y += tank.speed;
+    if (keys['q'] || keys['arrowleft']) tank.x -= tank.speed;
+    if (keys['d'] || keys['arrowright']) tank.x += tank.speed;
 
-    if (keys['z'] || keys['arrowup']) { tank.y -= tank.speed; moving = true; targetAngle = -Math.PI / 2; }
-    if (keys['s'] || keys['arrowdown']) { tank.y += tank.speed; moving = true; targetAngle = Math.PI / 2; }
-    if (keys['q'] || keys['arrowleft']) { tank.x -= tank.speed; moving = true; targetAngle = Math.PI; }
-    if (keys['d'] || keys['arrowright']) { tank.x += tank.speed; moving = true; targetAngle = 0; }
-
-    // Diagonales fluides
-    if ((keys['z'] || keys['arrowup']) && (keys['d'] || keys['arrowright'])) targetAngle = -Math.PI / 4;
-    if ((keys['z'] || keys['arrowup']) && (keys['q'] || keys['arrowleft'])) targetAngle = -3 * Math.PI / 4;
-    if ((keys['s'] || keys['arrowdown']) && (keys['d'] || keys['arrowright'])) targetAngle = Math.PI / 4;
-    if ((keys['s'] || keys['arrowdown']) && (keys['q'] || keys['arrowleft'])) targetAngle = 3 * Math.PI / 4;
-
-    if (moving) {
-        tank.bodyAngle = targetAngle;
-    }
-
-    // Visée souris (Tourelle)
+    // --- VISÉE SOURIS (L'angle suit parfaitement le curseur) ---
     const dx = mouseX - tank.x;
     const dy = mouseY - tank.y;
     tank.angle = Math.atan2(dy, dx);
@@ -201,7 +187,6 @@ function gameLoop() {
         bullets[i].x += bullets[i].vx;
         bullets[i].y += bullets[i].vy;
 
-        // Supprimer si hors écran
         if (bullets[i].x < 0 || bullets[i].x > canvas.width || bullets[i].y < 0 || bullets[i].y > canvas.height) {
             bullets.splice(i, 1);
         }
@@ -210,36 +195,35 @@ function gameLoop() {
     // --- RENDU GRAPHIQUE ---
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Dessiner les projectiles (en utilisant le style de l'élément de ton image : lueur bleue / obus énergétique)
+    // Dessiner les projectiles énergétiques
     for (let b of bullets) {
         ctx.save();
         ctx.translate(b.x, b.y);
         ctx.rotate(b.angle);
         
-        // Forme de l'obus énergétique inspirée de ton design
         ctx.fillStyle = '#38bdf8';
         ctx.shadowBlur = 12;
         ctx.shadowColor = '#38bdf8';
-        ctx.fillRect(-12, -4, 24, 8); // Corps du projectile
+        ctx.fillRect(-12, -4, 24, 8);
         ctx.fillStyle = '#ffffff';
-        ctx.fillRect(-4, -2, 8, 4);   // Centre lumineux
+        ctx.fillRect(-4, -2, 8, 4);
         
         ctx.restore();
     }
 
-    // --- DESSINER LE TANK PRINCIPAL ---
+    // --- DESSINER LE TANK PRINCIPAL SANS BOGUE NI TRUC EN TROP ---
     ctx.save();
     ctx.translate(tank.x, tank.y);
     
-    // On oriente le tank selon sa direction de déplacement (corps)
-    ctx.rotate(tank.bodyAngle);
+    // Fait pivoter le tank pour pointer exactement vers la souris
+    ctx.rotate(tank.angle + Math.PI / 2); // Ajustement de l'axe de l'image
 
     if (tankImage.complete) {
-        // Découpage dynamique de la grande image principale à gauche
-        // (Tu peux ajuster les coordonnées sx, sy, sw, sh si ton image principale est positionnée différemment)
+        // Recadrage strict sur le grand tank de gauche uniquement (on évite les petits sprites de la roue)
+        // Ajuste 'tankImage.width * 0.48' si nécessaire pour couper pile avant la roue
         const srcX = 0;
         const srcY = 0;
-        const srcWidth = tankImage.width * 0.55; // Prend la partie gauche où se trouve le grand tank
+        const srcWidth = tankImage.width * 0.47; 
         const srcHeight = tankImage.height;
 
         ctx.drawImage(
