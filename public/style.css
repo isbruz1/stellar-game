@@ -11,7 +11,7 @@ body {
     overflow: hidden;
 }
 
-/* Écran cinématique d'introduction (Fond noir complet) */
+/* Écran cinématique d'introduction */
 .intro-overlay {
     position: fixed;
     top: 0;
@@ -148,7 +148,7 @@ body {
     100% { opacity: 1; transform: scale(1); }
 }
 
-/* Conteneur principal de l'écran de démarrage (Menu) */
+/* Menu Principal */
 .splash-container {
     text-align: center;
     background: rgba(18, 24, 38, 0.85);
@@ -161,7 +161,6 @@ body {
     transition: opacity 1s ease-in-out;
 }
 
-/* Style et animation de l'icône dans le menu */
 .logo-wrapper {
     position: relative;
     width: 150px;
@@ -204,7 +203,6 @@ body {
     50% { transform: scale(1.15); opacity: 0.7; }
 }
 
-/* Titre et sous-titre */
 .game-title {
     font-size: 28px;
     font-weight: 800;
@@ -220,7 +218,6 @@ body {
     margin: 0 0 25px 0;
 }
 
-/* Boutons du menu */
 .menu-box {
     display: flex;
     flex-direction: column;
@@ -272,7 +269,6 @@ body {
     border-radius: 4px;
 }
 
-/* Indicateur de statut de connexion */
 #server-status {
     display: inline-flex;
     align-items: center;
@@ -308,4 +304,12 @@ body {
 .status-online {
     color: #4ade80;
     border-color: rgba(34, 197, 94, 0.3);
+}
+
+/* Style du Canvas du Jeu */
+#gameCanvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+    background: #050b14;
 }

@@ -16,7 +16,7 @@
         </div>
     </div>
 
-    <!-- Écran de verrouillage / Saisie du pseudo (S'affiche après l'intro) -->
+    <!-- Écran de verrouillage / Saisie du pseudo -->
     <div id="login-screen" class="login-container" style="display: none; opacity: 0;">
         <div class="login-box">
             <img src="assets/stellar.png" alt="Logo" class="login-logo">
@@ -35,10 +35,9 @@
         <h1 id="animated-greeting"></h1>
     </div>
 
-    <!-- Écran de démarrage / Menu Principal (Masqué au début) -->
+    <!-- Écran de démarrage / Menu Principal -->
     <div id="splash-screen" class="splash-container" style="display: none; opacity: 0;">
         
-        <!-- Icône du jeu -->
         <div class="logo-wrapper">
             <img src="assets/stellar.png" alt="Stellar Game Logo" id="splash-logo">
             <div class="logo-glow"></div>
@@ -47,18 +46,21 @@
         <h1 class="game-title">STELLAR GAME</h1>
         <p class="game-subtitle">Préparez vos canons, le combat spatial commence</p>
 
-        <!-- Menu principal -->
         <div class="menu-box">
             <button id="start-btn" class="menu-btn primary">🎮 Jouer / Salon</button>
             <button id="settings-btn" class="menu-btn secondary">⚙️ Paramètres <span class="badge-soon">(Bientôt)</span></button>
         </div>
 
-        <!-- Indicateur de statut de connexion au serveur -->
         <div id="server-status" class="status-offline">
             <span class="status-dot"></span> 
             <span id="status-text">Connexion au serveur...</span>
         </div>
 
+    </div>
+
+    <!-- Écran de Jeu (Canvas plein écran) -->
+    <div id="game-container" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;">
+        <canvas id="gameCanvas"></canvas>
     </div>
 
     <!-- Socket.io et script principal -->
