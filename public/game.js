@@ -1,279 +1,189 @@
 /* ==================================================================
-   STELLAR GAME — Client V2
+   STELLAR GAME — Client V3
    ================================================================== */
 
-// ---------- Persistance ----------
-let pseudo    = localStorage.getItem("pseudo")   || "";
-let realName  = localStorage.getItem("realName") || "";
-let currentSkin = parseInt(localStorage.getItem("skin") || "0");
+// ---------- Accounts (localStorage) ----------
+function loadAccounts() {
+  try { return JSON.parse(localStorage.getItem("accounts") || "[]"); }
+  catch { return []; }
+}
+function saveAccounts(a) { localStorage.setItem("accounts", JSON.stringify(a)); }
+
+let accounts = loadAccounts();
+let currentAccount = null; // { pseudo, realName, skin }
 
 // ---------- Runtime ----------
 let myId = null, hostId = null, currentRoomId = null;
 let lobbyPlayers = {}, gameStarted = false;
-let serverState = { players: {}, bullets: [], zones: [] };
+let serverState = { players: {}, bullets: [], zones: [], mapData: null, announcement: null };
 let myAngle = 0;
-let activeEffects = {};
+let dead = false;
+let spectating = null;
 const keys = { up: false, down: false, left: false, right: false };
 let socket = null;
+let selectedAccountIdx = -1;
 
 // ---------- DOM ----------
 const $ = id => document.getElementById(id);
+const splashScreen    = $("splashScreen");
+const profilesScreen  = $("profilesScreen");
+const newAccountScreen= $("newAccountScreen");
+const mainMenu        = $("mainMenuScreen");
+const serverBrowser   = $("serverBrowser");
+const lobbyScreen     = $("lobbyScreen");
+const gameScreen      = $("gameScreen");
 
-const splashScreen  = $("splashScreen");
-const loginScreen   = $("loginScreen");
-const mainMenu      = $("mainMenuScreen");
-const serverBrowser = $("serverBrowser");
-const lobbyScreen   = $("lobbyScreen");
-const gameScreen    = $("gameScreen");
-
-const loginBtn    = $("loginBtn");
-const loginPseudo = $("pseudoInput");
-const loginReal   = $("realNameInput");
+const pseudoInput = $("pseudoInput");
+const realNameInput = $("realNameInput");
 const pseudoError = $("pseudoError");
+const createAccountBtn = $("createAccountBtn");
+const backToProfilesBtn = $("backToProfilesBtn");
+const newAccountBtn = $("newAccountBtn");
+const enterLobbyBtn = $("enterLobbyBtn");
+const accountList = $("accountList");
+const previewCanvas = $("previewCanvas");
+const previewPseudo = $("previewPseudo");
+const previewReal = $("previewReal");
 
-const playBtn       = $("playBtn");
-const closeBrowser  = $("closeBrowser");
-const roomsListEl   = $("roomsList");
-const roomsCountEl  = $("roomsCount");
-const refreshRooms  = $("refreshRooms");
-const codeInput     = $("codeInput");
+const userPseudoEl = $("userPseudo");
+const userRealEl = $("userReal");
+const disconnectBtn = $("disconnectBtn");
+
+const playBtn = $("playBtn");
+const closeBrowser = $("closeBrowser");
+const roomsListEl = $("roomsList");
+const roomsCountEl = $("roomsCount");
+const refreshRooms = $("refreshRooms");
+const codeInput = $("codeInput");
 const joinByCodeBtn = $("joinByCodeBtn");
 const serverNameInput = $("serverNameInput");
 const createRoomBtn = $("createRoomBtn");
 
-const playersGrid  = $("playersGrid");
-const playerCount  = $("playerCount");
-const actionBtn    = $("actionBtn");
-const quitBtn      = $("quitBtn");
+const playersGrid = $("playersGrid");
+const playerCount = $("playerCount");
+const actionBtn = $("actionBtn");
+const quitBtn = $("quitBtn");
 const roomCodeDisplay = $("roomCodeDisplay");
 const roomNameDisplay = $("roomNameDisplay");
 
-const settingsBtn  = $("settingsBtn");
-const settingsBtn2 = $("settingsBtn2");
-const settingsModal= $("settingsModal");
-const closeSettings= $("closeSettings");
-const settingsPseudo   = $("settingsPseudo");
+const settingsModal = $("settingsModal");
+const closeSettings = $("closeSettings");
+const settingsPseudo = $("settingsPseudo");
 const settingsRealName = $("settingsRealName");
-const skinPicker   = $("skinPicker");
-
-const userPseudoEl = $("userPseudo");
-const userRealEl   = $("userReal");
+const skinPicker = $("skinPicker");
 
 const canvas = $("game");
-const ctx    = canvas.getContext("2d");
+const ctx = canvas.getContext("2d");
+const minimap = $("minimap");
+const mmCtx = minimap.getContext("2d");
 
-// ---------- Écrans ----------
+// ---------- Screens ----------
 function showScreen(name) {
-  splashScreen.classList.toggle("hidden",  name !== "splash");
-  loginScreen.classList.toggle("hidden",   name !== "login");
-  mainMenu.classList.toggle("hidden",      name !== "menu");
-  serverBrowser.classList.toggle("hidden", name !== "browser");
-  lobbyScreen.classList.toggle("hidden",   name !== "lobby");
-  gameScreen.classList.toggle("hidden",    name !== "game");
+  [splashScreen, profilesScreen, newAccountScreen, mainMenu, serverBrowser, lobbyScreen, gameScreen]
+    .forEach(s => s.classList.add("hidden"));
+  const map = {
+    splash: splashScreen, profiles: profilesScreen, newAccount: newAccountScreen,
+    menu: mainMenu, browser: serverBrowser, lobby: lobbyScreen, game: gameScreen
+  };
+  if (map[name]) map[name].classList.remove("hidden");
   if (name === "game") resizeCanvas();
 }
 
 // ==================================================================
-//  SPLASH — GALAXY ANIMATION
+//  SPLASH GALAXY
 // ==================================================================
-(function initGalaxySplash() {
+(function initGalaxy() {
   const c = $("galaxyCanvas");
   const g = c.getContext("2d");
   let running = true;
-
-  function resize() {
-    c.width = window.innerWidth;
-    c.height = window.innerHeight;
-  }
+  function resize() { c.width = window.innerWidth; c.height = window.innerHeight; }
   resize();
   window.addEventListener("resize", resize);
 
-  // Spiral galaxy particles
   const galaxy = [];
-  const cx = () => c.width / 2;
-  const cy = () => c.height / 2;
-
   for (let i = 0; i < 600; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const arms = 2;
-    const armAngle = (Math.floor(Math.random() * arms) / arms) * Math.PI * 2;
+    const armAngle = (Math.floor(Math.random() * 2) / 2) * Math.PI * 2;
     const dist = Math.pow(Math.random(), 0.6) * Math.min(c.width, c.height) * 0.45;
-    const spiralOffset = dist * 0.008;
     galaxy.push({
-      baseAngle: armAngle + spiralOffset,
-      dist,
+      baseAngle: armAngle + dist * 0.008, dist,
       size: Math.random() * 1.6 + 0.3,
       speed: 0.0002 + Math.random() * 0.0004,
-      hue: Math.random() * 60 + 200, // bleu/violet
-      alpha: Math.random() * 0.6 + 0.3
+      hue: Math.random() * 60 + 200, alpha: Math.random() * 0.6 + 0.3
     });
   }
-
-  // Background stars
   const stars = [];
   for (let i = 0; i < 200; i++) {
-    stars.push({
-      x: Math.random() * c.width,
-      y: Math.random() * c.height,
-      r: Math.random() * 1.2 + 0.2,
-      alpha: Math.random() * 0.6 + 0.2,
-      twinkle: Math.random() * 0.02 + 0.005
-    });
+    stars.push({ x: Math.random() * c.width, y: Math.random() * c.height, r: Math.random() * 1.2 + 0.2, alpha: Math.random() * 0.6 + 0.2, twinkle: Math.random() * 0.02 + 0.005 });
   }
-
-  // Shooting stars
-  const shooting = [];
-  function spawnShooting() {
-    shooting.push({
-      x: Math.random() * c.width * 0.6,
-      y: Math.random() * c.height * 0.4,
-      len: 150 + Math.random() * 100,
-      speed: 8 + Math.random() * 6,
-      alpha: 1,
-      angle: Math.PI / 4 + (Math.random() - 0.5) * 0.3
-    });
-  }
-
   let t = 0;
-  function loop() {
+  (function loop() {
     if (!running) return;
     t++;
+    const bg = g.createRadialGradient(c.width/2, c.height/2, 50, c.width/2, c.height/2, Math.max(c.width, c.height));
+    bg.addColorStop(0, "#0a1530"); bg.addColorStop(0.5, "#050a1e"); bg.addColorStop(1, "#000");
+    g.fillStyle = bg; g.fillRect(0, 0, c.width, c.height);
 
-    // Fond noir dégradé
-    const bgGrad = g.createRadialGradient(cx(), cy(), 50, cx(), cy(), Math.max(c.width, c.height));
-    bgGrad.addColorStop(0, "#0a1530");
-    bgGrad.addColorStop(0.5, "#050a1e");
-    bgGrad.addColorStop(1, "#000000");
-    g.fillStyle = bgGrad;
-    g.fillRect(0, 0, c.width, c.height);
-
-    // Stars
     stars.forEach(s => {
       s.alpha += (Math.random() - 0.5) * s.twinkle;
       s.alpha = Math.max(0.1, Math.min(0.9, s.alpha));
-      g.fillStyle = `rgba(200, 220, 255, ${s.alpha})`;
-      g.beginPath();
-      g.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-      g.fill();
+      g.fillStyle = `rgba(200,220,255,${s.alpha})`;
+      g.beginPath(); g.arc(s.x, s.y, s.r, 0, Math.PI*2); g.fill();
     });
 
-    // Galaxy spiral
     galaxy.forEach(p => {
-      const angle = p.baseAngle + t * p.speed;
-      const x = cx() + Math.cos(angle) * p.dist;
-      const y = cy() + Math.sin(angle) * p.dist * 0.55; // aplatir pour effet 3D
+      const a = p.baseAngle + t * p.speed;
+      const x = c.width/2 + Math.cos(a) * p.dist;
+      const y = c.height/2 + Math.sin(a) * p.dist * 0.55;
       g.fillStyle = `hsla(${p.hue}, 80%, 65%, ${p.alpha})`;
-      g.beginPath();
-      g.arc(x, y, p.size, 0, Math.PI * 2);
-      g.fill();
+      g.beginPath(); g.arc(x, y, p.size, 0, Math.PI*2); g.fill();
     });
 
-    // Centre lumineux
-    const coreGlow = g.createRadialGradient(cx(), cy(), 0, cx(), cy(), 180);
-    coreGlow.addColorStop(0, "rgba(120, 180, 255, 0.4)");
-    coreGlow.addColorStop(0.4, "rgba(80, 120, 220, 0.15)");
-    coreGlow.addColorStop(1, "rgba(0, 0, 0, 0)");
-    g.fillStyle = coreGlow;
-    g.beginPath();
-    g.arc(cx(), cy(), 180, 0, Math.PI * 2);
-    g.fill();
-
-    // Shooting stars
-    if (Math.random() < 0.008 && shooting.length < 3) spawnShooting();
-    for (let i = shooting.length - 1; i >= 0; i--) {
-      const sh = shooting[i];
-      const ex = sh.x + Math.cos(sh.angle) * sh.len;
-      const ey = sh.y + Math.sin(sh.angle) * sh.len;
-      const grad = g.createLinearGradient(sh.x, sh.y, ex, ey);
-      grad.addColorStop(0, `rgba(200, 230, 255, ${sh.alpha})`);
-      grad.addColorStop(1, "rgba(200, 230, 255, 0)");
-      g.strokeStyle = grad;
-      g.lineWidth = 2;
-      g.beginPath();
-      g.moveTo(sh.x, sh.y);
-      g.lineTo(ex, ey);
-      g.stroke();
-
-      sh.x += Math.cos(sh.angle) * sh.speed;
-      sh.y += Math.sin(sh.angle) * sh.speed;
-      sh.alpha -= 0.015;
-      if (sh.alpha <= 0 || sh.x > c.width + 200 || sh.y > c.height + 200) {
-        shooting.splice(i, 1);
-      }
-    }
+    const core = g.createRadialGradient(c.width/2, c.height/2, 0, c.width/2, c.height/2, 180);
+    core.addColorStop(0, "rgba(120,180,255,0.4)");
+    core.addColorStop(0.4, "rgba(80,120,220,0.15)");
+    core.addColorStop(1, "rgba(0,0,0,0)");
+    g.fillStyle = core;
+    g.beginPath(); g.arc(c.width/2, c.height/2, 180, 0, Math.PI*2); g.fill();
 
     requestAnimationFrame(loop);
-  }
-  loop();
-
+  })();
   window.__stopGalaxy = () => { running = false; };
 })();
 
 // ==================================================================
-//  LOGIN BACKGROUND — étoiles flottantes
+//  BACKGROUND générique (profils / newAccount / menu)
 // ==================================================================
-(function initLoginBg() {
-  const c = $("loginCanvas");
+function initStarfield(canvasId, opacity = 0.5) {
+  const c = $(canvasId);
   if (!c) return;
   const g = c.getContext("2d");
   let running = true;
-
-  function resize() {
-    c.width = window.innerWidth;
-    c.height = window.innerHeight;
-  }
+  function resize() { c.width = window.innerWidth; c.height = window.innerHeight; }
   resize();
   window.addEventListener("resize", resize);
 
-  const particles = [];
-  for (let i = 0; i < 80; i++) {
-    particles.push({
-      x: Math.random() * c.width,
-      y: Math.random() * c.height,
-      vx: (Math.random() - 0.5) * 0.3,
-      vy: (Math.random() - 0.5) * 0.3,
-      r: Math.random() * 1.5 + 0.5
+  const stars = [];
+  for (let i = 0; i < 120; i++) {
+    stars.push({
+      x: Math.random() * c.width, y: Math.random() * c.height,
+      r: Math.random() * 1.4 + 0.3, alpha: Math.random() * 0.7 + 0.3,
+      speed: Math.random() * 0.3 + 0.05
     });
   }
-
-  function loop() {
+  (function loop() {
     if (!running) return;
-    g.clearRect(0, 0, c.width, c.height);
-    particles.forEach(p => {
-      p.x += p.vx;
-      p.y += p.vy;
-      if (p.x < 0) p.x = c.width;
-      if (p.x > c.width) p.x = 0;
-      if (p.y < 0) p.y = c.height;
-      if (p.y > c.height) p.y = 0;
-      g.fillStyle = "rgba(100, 180, 255, 0.5)";
-      g.beginPath();
-      g.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-      g.fill();
+    g.fillStyle = `rgba(3,4,13,${opacity})`;
+    g.fillRect(0, 0, c.width, c.height);
+    stars.forEach(s => {
+      s.y += s.speed;
+      if (s.y > c.height) { s.y = 0; s.x = Math.random() * c.width; }
+      g.fillStyle = `rgba(180,220,255,${s.alpha})`;
+      g.beginPath(); g.arc(s.x, s.y, s.r, 0, Math.PI*2); g.fill();
     });
-
-    // Lignes entre particules proches
-    for (let i = 0; i < particles.length; i++) {
-      for (let j = i + 1; j < particles.length; j++) {
-        const dx = particles[i].x - particles[j].x;
-        const dy = particles[i].y - particles[j].y;
-        const d = Math.hypot(dx, dy);
-        if (d < 120) {
-          g.strokeStyle = `rgba(68, 170, 255, ${0.15 * (1 - d / 120)})`;
-          g.lineWidth = 1;
-          g.beginPath();
-          g.moveTo(particles[i].x, particles[i].y);
-          g.lineTo(particles[j].x, particles[j].y);
-          g.stroke();
-        }
-      }
-    }
     requestAnimationFrame(loop);
-  }
-  loop();
-
-  window.__stopLoginBg = () => { running = false; };
-})();
+  })();
+  return () => { running = false; };
+}
 
 // ==================================================================
 //  FLOW DÉMARRAGE
@@ -282,50 +192,150 @@ showScreen("splash");
 
 setTimeout(() => {
   window.__stopGalaxy && window.__stopGalaxy();
-  if (pseudo.length >= 5 && realName.trim().length > 0) {
-    startConnection();
-    showScreen("menu");
-  } else {
-    loginPseudo.value = pseudo;
-    loginReal.value = realName;
-    validateLoginForm();
-    showScreen("login");
-    loginPseudo.focus();
-  }
-}, 4200);
+  showScreen("profiles");
+  initStarfield("profilesCanvas");
+  renderAccounts();
+}, 3800);
 
-// ---------- Login ----------
-function validateLoginForm() {
-  const p = loginPseudo.value.trim();
-  const r = loginReal.value.trim();
-  if (p.length === 0) pseudoError.textContent = "";
-  else if (p.length < 5) pseudoError.textContent = "Le pseudo doit faire au moins 5 caractères.";
-  else if (p.length > 16) pseudoError.textContent = "Maximum 16 caractères.";
-  else pseudoError.textContent = "";
-  loginBtn.disabled = !(p.length >= 5 && r.length > 0);
+// ==================================================================
+//  COMPTES
+// ==================================================================
+function renderAccounts() {
+  accountList.innerHTML = "";
+  if (accounts.length === 0) {
+    accountList.innerHTML = `<div class="no-rooms" style="grid-column:1/-1">AUCUN COMPTE<br><span class="muted">Crée-en un pour commencer</span></div>`;
+    enterLobbyBtn.disabled = true;
+    previewPseudo.textContent = "—";
+    previewReal.textContent = "—";
+    return;
+  }
+
+  accounts.forEach((acc, idx) => {
+    const card = document.createElement("div");
+    card.className = "account-card";
+    if (idx === selectedAccountIdx) card.classList.add("selected");
+
+    const c = document.createElement("canvas");
+    c.width = 80; c.height = 80;
+    drawTankPreview(c, acc.skin || 0);
+    card.appendChild(c);
+
+    const n = document.createElement("div");
+    n.className = "name";
+    n.textContent = acc.pseudo;
+    card.appendChild(n);
+
+    const r = document.createElement("div");
+    r.className = "real";
+    r.textContent = acc.realName || "";
+    card.appendChild(r);
+
+    const del = document.createElement("button");
+    del.className = "delete-btn";
+    del.textContent = "✕";
+    del.title = "Supprimer ce compte";
+    del.addEventListener("click", e => {
+      e.stopPropagation();
+      if (confirm(`⚠️ Supprimer DÉFINITIVEMENT le compte "${acc.pseudo}" ?\n\nCette action est irréversible.`)) {
+        if (confirm(`Dernière confirmation : supprimer "${acc.pseudo}" et le retirer du serveur ?`)) {
+          accounts.splice(idx, 1);
+          saveAccounts(accounts);
+          if (currentAccount && currentAccount.pseudo === acc.pseudo) currentAccount = null;
+          if (selectedAccountIdx >= accounts.length) selectedAccountIdx = accounts.length - 1;
+          if (socket) socket.emit("delete-account", acc.pseudo);
+          renderAccounts();
+          showDeleteBanner(acc.pseudo);
+        }
+      }
+    });
+    card.appendChild(del);
+
+    card.addEventListener("click", () => {
+      selectedAccountIdx = idx;
+      renderAccounts();
+      previewAccount(acc);
+    });
+
+    accountList.appendChild(card);
+  });
+
+  if (selectedAccountIdx >= 0 && accounts[selectedAccountIdx]) {
+    previewAccount(accounts[selectedAccountIdx]);
+  } else {
+    selectedAccountIdx = 0;
+    previewAccount(accounts[0]);
+  }
 }
 
-loginPseudo.addEventListener("input", validateLoginForm);
-loginReal.addEventListener("input", validateLoginForm);
+function previewAccount(acc) {
+  previewPseudo.textContent = acc.pseudo;
+  previewReal.textContent = acc.realName || "";
+  const c = previewCanvas;
+  const cx = c.getContext("2d");
+  cx.clearRect(0, 0, c.width, c.height);
+  cx.save();
+  cx.translate(c.width / 2, c.height / 2);
+  drawTankShape(cx, acc.skin || 0, -Math.PI / 2, 2.2);
+  cx.restore();
+  enterLobbyBtn.disabled = false;
+}
 
-loginBtn.addEventListener("click", () => {
-  const p = loginPseudo.value.trim();
-  const r = loginReal.value.trim();
-  if (p.length < 5 || r.length === 0) return;
+function showDeleteBanner(pseudo) {
+  const banner = document.createElement("div");
+  banner.className = "delete-banner";
+  banner.textContent = `⚠️ COMPTE "${pseudo}" SUPPRIMÉ DÉFINITIVEMENT DU SERVEUR ⚠️`;
+  document.body.insertBefore(banner, document.body.firstChild);
+  setTimeout(() => banner.remove(), 5000);
+}
 
-  pseudo = p; realName = r;
-  localStorage.setItem("pseudo", pseudo);
-  localStorage.setItem("realName", realName);
-
-  window.__stopLoginBg && window.__stopLoginBg();
+enterLobbyBtn.addEventListener("click", () => {
+  if (selectedAccountIdx < 0 || !accounts[selectedAccountIdx]) return;
+  currentAccount = { ...accounts[selectedAccountIdx] };
+  userPseudoEl.textContent = currentAccount.pseudo;
+  userRealEl.textContent = currentAccount.realName;
   startConnection();
   showScreen("menu");
+  initStarfield("menuCanvas");
 });
 
-[loginPseudo, loginReal].forEach(el => {
-  el.addEventListener("keydown", e => {
-    if (e.key === "Enter" && !loginBtn.disabled) loginBtn.click();
-  });
+newAccountBtn.addEventListener("click", () => {
+  pseudoInput.value = "";
+  realNameInput.value = "";
+  pseudoError.textContent = "";
+  createAccountBtn.disabled = true;
+  showScreen("newAccount");
+  initStarfield("newAccountCanvas");
+  pseudoInput.focus();
+});
+
+backToProfilesBtn.addEventListener("click", () => showScreen("profiles"));
+
+// Validation nouveau compte
+function validateNewAccount() {
+  const p = pseudoInput.value.trim();
+  const r = realNameInput.value.trim();
+  if (p.length === 0) pseudoError.textContent = "";
+  else if (p.length < 5) pseudoError.textContent = "Minimum 5 caractères.";
+  else if (p.length > 16) pseudoError.textContent = "Maximum 16 caractères.";
+  else if (accounts.some(a => a.pseudo.toLowerCase() === p.toLowerCase()))
+    pseudoError.textContent = "Ce pseudo existe déjà.";
+  else pseudoError.textContent = "";
+  createAccountBtn.disabled = !(p.length >= 5 && p.length <= 16 &&
+    r.length > 0 && !accounts.some(a => a.pseudo.toLowerCase() === p.toLowerCase()));
+}
+pseudoInput.addEventListener("input", validateNewAccount);
+realNameInput.addEventListener("input", validateNewAccount);
+
+createAccountBtn.addEventListener("click", () => {
+  const p = pseudoInput.value.trim();
+  const r = realNameInput.value.trim();
+  if (p.length < 5 || r.length === 0) return;
+  const acc = { pseudo: p, realName: r, skin: 0 };
+  accounts.push(acc);
+  saveAccounts(accounts);
+  selectedAccountIdx = accounts.length - 1;
+  showScreen("profiles");
+  renderAccounts();
 });
 
 // ==================================================================
@@ -337,26 +347,24 @@ function startConnection() {
 
   socket.on("connect", () => {
     myId = socket.id;
-    userPseudoEl.textContent = pseudo;
-    userRealEl.textContent = realName;
     socket.emit("list-rooms");
   });
 
-  // ----- Server list -----
   socket.on("room-list-update", list => {
     renderRoomList(list);
-    $("onlineCount").textContent = `${list.length} serveur${list.length > 1 ? "s" : ""} actif${list.length > 1 ? "s" : ""}`;
+    const el = $("onlineCount");
+    if (el) el.textContent = `${list.length} serveur${list.length > 1 ? "s" : ""} actif${list.length > 1 ? "s" : ""}`;
   });
 
-  // ----- Création / rejoindre -----
   socket.on("room-created", data => {
     currentRoomId = data.id;
     roomCodeDisplay.textContent = data.id;
     roomNameDisplay.textContent = "— " + data.name;
-    // On rejoint notre propre room
     socket.emit("join-room", {
       id: data.id,
-      pseudo, realName, skin: currentSkin
+      pseudo: currentAccount.pseudo,
+      realName: currentAccount.realName,
+      skin: currentAccount.skin || 0
     });
   });
 
@@ -367,9 +375,7 @@ function startConnection() {
     showScreen("lobby");
   });
 
-  socket.on("join-error", msg => {
-    alert("❌ " + msg);
-  });
+  socket.on("join-error", msg => alert("❌ " + msg));
 
   socket.on("left-room", () => {
     currentRoomId = null;
@@ -377,7 +383,10 @@ function startConnection() {
     socket.emit("list-rooms");
   });
 
-  // ----- Lobby -----
+  socket.on("account-deleted", () => {
+    if (socket) { socket.disconnect(); socket = null; }
+  });
+
   socket.on("lobby-update", data => {
     lobbyPlayers = data.players;
     hostId = data.hostId;
@@ -392,7 +401,10 @@ function startConnection() {
 
   socket.on("game-started", () => {
     gameStarted = true;
+    dead = false;
     showScreen("game");
+    $("deathScreen").classList.add("hidden");
+    $("spectatePanel").classList.add("hidden");
     keys.up = keys.down = keys.left = keys.right = false;
   });
 
@@ -401,7 +413,23 @@ function startConnection() {
     showScreen("lobby");
   });
 
-  socket.on("state", s => { serverState = s; });
+  socket.on("state", s => {
+    const wasAlive = serverState.players[myId]?.alive;
+    serverState = s;
+
+    // Détection mort
+    const me = s.players[myId];
+    if (me && !me.alive && !dead && gameStarted) {
+      dead = true;
+      $("deathScreen").classList.remove("hidden");
+    }
+    if (me && me.alive && dead) {
+      dead = false;
+      $("deathScreen").classList.add("hidden");
+      $("spectatePanel").classList.add("hidden");
+      spectating = null;
+    }
+  });
 }
 
 // ==================================================================
@@ -412,8 +440,17 @@ playBtn.addEventListener("click", () => {
   if (socket) socket.emit("list-rooms");
 });
 
+disconnectBtn.addEventListener("click", () => {
+  if (!confirm("Se déconnecter ?")) return;
+  if (socket) { socket.disconnect(); socket = null; }
+  currentAccount = null;
+  selectedAccountIdx = -1;
+  showScreen("profiles");
+  renderAccounts();
+});
+
 // ==================================================================
-//  SERVER BROWSER
+//  BROWSER
 // ==================================================================
 closeBrowser.addEventListener("click", () => showScreen("menu"));
 
@@ -431,9 +468,14 @@ refreshRooms.addEventListener("click", () => socket && socket.emit("list-rooms")
 
 joinByCodeBtn.addEventListener("click", () => {
   const code = codeInput.value.trim().toUpperCase();
-  if (code.length !== 5) { alert("Code à 5 caractères."); return; }
+  if (code.length !== 5) return alert("Code à 5 caractères.");
   if (!socket) return;
-  socket.emit("join-room", { id: code, pseudo, realName, skin: currentSkin });
+  socket.emit("join-room", {
+    id: code,
+    pseudo: currentAccount.pseudo,
+    realName: currentAccount.realName,
+    skin: currentAccount.skin || 0
+  });
 });
 
 codeInput.addEventListener("input", () => {
@@ -442,15 +484,16 @@ codeInput.addEventListener("input", () => {
 
 createRoomBtn.addEventListener("click", () => {
   if (!socket) return;
-  const name = (serverNameInput.value.trim() || `Serveur de ${pseudo}`).slice(0, 24);
+  const name = (serverNameInput.value.trim() || `Serveur de ${currentAccount.pseudo}`).slice(0, 24);
   socket.emit("create-room", { name });
 });
 
 function renderRoomList(list) {
-  roomsCountEl.textContent = `${list.length} serveur${list.length > 1 ? "s" : ""} disponible${list.length > 1 ? "s" : ""}`;
+  if (!roomsCountEl) return;
+  roomsCountEl.textContent = `${list.length} serveur${list.length > 1 ? "s" : ""}`;
   roomsListEl.innerHTML = "";
   if (list.length === 0) {
-    roomsListEl.innerHTML = `<div class="no-rooms">AUCUN SERVEUR POUR LE MOMENT<br><span class="small">Crée le tien dans l'onglet "CRÉER"</span></div>`;
+    roomsListEl.innerHTML = `<div class="no-rooms">AUCUN SERVEUR DISPONIBLE<br><span class="muted">Crée le tien dans l'onglet CRÉER</span></div>`;
     return;
   }
   list.forEach(r => {
@@ -459,11 +502,11 @@ function renderRoomList(list) {
     if (r.count >= r.max) el.classList.add("full");
     el.innerHTML = `
       <div class="room-item-info">
-        <div class="room-item-name">${escapeHtml(r.name)}</div>
+        <div class="room-item-name">${esc(r.name)}</div>
         <div class="room-item-meta">
-          <span>Hôte : <b>${escapeHtml(r.host)}</b></span>
+          <span>Hôte : <b>${esc(r.host)}</b></span>
           <span class="code">${r.id}</span>
-          <span>${r.count}/${r.max} joueur${r.count > 1 ? "s" : ""}</span>
+          <span>${r.count}/${r.max}</span>
         </div>
       </div>
       <button class="join-btn">${r.started ? "EN COURS" : "REJOINDRE"}</button>
@@ -471,7 +514,8 @@ function renderRoomList(list) {
     if (!r.started && r.count < r.max) {
       el.querySelector(".join-btn").addEventListener("click", () => {
         socket.emit("join-room", {
-          id: r.id, pseudo, realName, skin: currentSkin
+          id: r.id, pseudo: currentAccount.pseudo,
+          realName: currentAccount.realName, skin: currentAccount.skin || 0
         });
       });
     }
@@ -479,10 +523,8 @@ function renderRoomList(list) {
   });
 }
 
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, c => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
-  }[c]));
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 }
 
 // ==================================================================
@@ -492,43 +534,33 @@ function renderLobby() {
   playersGrid.innerHTML = "";
   const list = Object.values(lobbyPlayers);
   playerCount.textContent = `(${list.length})`;
-
   list.forEach(p => {
     const card = document.createElement("div");
     card.className = "player-card";
     if (p.id === hostId) card.classList.add("host");
     if (p.ready) card.classList.add("ready");
-
     const c = document.createElement("canvas");
     c.width = 80; c.height = 80;
     drawTankPreview(c, p.skin);
     card.appendChild(c);
-
-    const name = document.createElement("div");
-    name.className = "name";
-    name.textContent = p.pseudo + (p.id === myId ? " (toi)" : "");
-    card.appendChild(name);
-
+    const n = document.createElement("div");
+    n.className = "name"; n.textContent = p.pseudo + (p.id === myId ? " (toi)" : "");
+    card.appendChild(n);
     if (p.realName) {
-      const rn = document.createElement("div");
-      rn.className = "realname";
-      rn.textContent = p.realName;
-      card.appendChild(rn);
+      const r = document.createElement("div");
+      r.className = "realname"; r.textContent = p.realName;
+      card.appendChild(r);
     }
-
     if (p.id === hostId) {
       const b = document.createElement("div");
-      b.className = "badge";
-      b.textContent = "HÔTE";
+      b.className = "badge"; b.textContent = "HÔTE";
       card.appendChild(b);
     }
     if (p.ready && p.id !== hostId) {
       const t = document.createElement("div");
-      t.className = "ready-tag";
-      t.textContent = "✓ PRÊT";
+      t.className = "ready-tag"; t.textContent = "✓ PRÊT";
       card.appendChild(t);
     }
-
     playersGrid.appendChild(card);
   });
 }
@@ -536,7 +568,6 @@ function renderLobby() {
 function updateActionButtons() {
   if (!myId || !hostId) return;
   const isHost = myId === hostId;
-
   if (isHost) {
     const guests = Object.values(lobbyPlayers).filter(p => p.id !== hostId);
     actionBtn.textContent = "JOUER";
@@ -560,59 +591,109 @@ actionBtn.addEventListener("click", () => {
 });
 
 quitBtn.addEventListener("click", () => {
-  if (confirm("Quitter le serveur ?")) {
-    socket.emit("leave-room");
-  }
+  if (confirm("Quitter le serveur ?")) socket.emit("leave-room");
 });
 
-document.getElementById("leaveGameBtn").addEventListener("click", () => {
+$("leaveGameBtn").addEventListener("click", () => {
   if (!socket) return;
   socket.emit("leave-game");
   gameStarted = false;
+  dead = false;
+  spectating = null;
   showScreen("lobby");
 });
+
+// ==================================================================
+//  DEATH SCREEN
+// ==================================================================
+$("backToLobbyBtn").addEventListener("click", () => {
+  if (!socket) return;
+  socket.emit("leave-game");
+  dead = false;
+  spectating = null;
+  gameStarted = false;
+  showScreen("lobby");
+});
+
+$("spectateBtn").addEventListener("click", () => {
+  $("deathScreen").classList.add("hidden");
+  $("spectatePanel").classList.remove("hidden");
+  renderSpectateList();
+});
+
+$("stopSpectateBtn").addEventListener("click", () => {
+  if (socket) socket.emit("stop-spectate");
+  spectating = null;
+  $("spectatePanel").classList.add("hidden");
+  $("deathScreen").classList.remove("hidden");
+});
+
+function renderSpectateList() {
+  const list = $("spectateList");
+  list.innerHTML = "";
+  Object.values(serverState.players).forEach(p => {
+    if (!p.alive || p.id === myId) return;
+    const el = document.createElement("div");
+    el.className = "spectate-item" + (spectating === p.id ? " active" : "");
+    el.textContent = `${p.pseudo} (${Math.round(p.hp)} HP) — 👁 ${p.spectators || 0}`;
+    el.addEventListener("click", () => {
+      if (socket) socket.emit("spectate", p.id);
+      spectating = p.id;
+      renderSpectateList();
+    });
+    list.appendChild(el);
+  });
+}
 
 // ==================================================================
 //  PARAMÈTRES
 // ==================================================================
 function openSettings() {
-  settingsPseudo.value = pseudo;
-  settingsRealName.value = realName;
+  settingsPseudo.value = currentAccount?.pseudo || "";
+  settingsRealName.value = currentAccount?.realName || "";
   settingsModal.classList.remove("hidden");
   buildSkinPicker();
 }
-settingsBtn.addEventListener("click", openSettings);
-settingsBtn2.addEventListener("click", openSettings);
+$("settingsBtn")?.addEventListener("click", openSettings);
 closeSettings.addEventListener("click", () => settingsModal.classList.add("hidden"));
 
 settingsPseudo.addEventListener("change", () => {
   const v = (settingsPseudo.value || "").trim();
-  if (v.length < 5 || v.length > 16) { settingsPseudo.value = pseudo; return; }
-  pseudo = v;
-  localStorage.setItem("pseudo", pseudo);
-  userPseudoEl.textContent = pseudo;
-  if (socket) socket.emit("update-pseudo", pseudo);
+  if (v.length < 5 || v.length > 16) { settingsPseudo.value = currentAccount.pseudo; return; }
+  currentAccount.pseudo = v;
+  userPseudoEl.textContent = v;
+  updateAccountInStorage();
+  if (socket) socket.emit("update-pseudo", v);
 });
 
 settingsRealName.addEventListener("change", () => {
   const v = (settingsRealName.value || "").trim().slice(0, 32);
-  realName = v;
-  localStorage.setItem("realName", realName);
-  userRealEl.textContent = realName;
-  if (socket) socket.emit("update-realname", realName);
+  currentAccount.realName = v;
+  userRealEl.textContent = v;
+  updateAccountInStorage();
+  if (socket) socket.emit("update-realname", v);
 });
+
+function updateAccountInStorage() {
+  const i = accounts.findIndex(a => a.pseudo === currentAccount.pseudo);
+  // On récupère par pseudo d'origine - plus simple : on remplace l'entrée sélectionnée
+  if (selectedAccountIdx >= 0 && accounts[selectedAccountIdx]) {
+    accounts[selectedAccountIdx] = { ...currentAccount };
+    saveAccounts(accounts);
+  }
+}
 
 function buildSkinPicker() {
   skinPicker.innerHTML = "";
   SKINS.forEach((s, i) => {
     const c = document.createElement("canvas");
     c.width = 70; c.height = 70;
-    c.className = "skin-option" + (i === currentSkin ? " selected" : "");
+    c.className = "skin-option" + (i === (currentAccount?.skin || 0) ? " selected" : "");
     c.title = s.name;
     drawTankPreview(c, i);
     c.addEventListener("click", () => {
-      currentSkin = i;
-      localStorage.setItem("skin", i);
+      currentAccount.skin = i;
+      updateAccountInStorage();
       if (socket) socket.emit("update-skin", i);
       buildSkinPicker();
     });
@@ -624,19 +705,17 @@ function buildSkinPicker() {
 //  CLAVIER
 // ==================================================================
 const keyMap = {
-  "z": "up",    "w": "up",    "arrowup": "up",
-  "s": "down",  "arrowdown": "down",
-  "q": "left",  "a": "left",  "arrowleft": "left",
-  "d": "right", "arrowright": "right"
+  "z":"up","w":"up","arrowup":"up",
+  "s":"down","arrowdown":"down",
+  "q":"left","a":"left","arrowleft":"left",
+  "d":"right","arrowright":"right"
 };
-
 window.addEventListener("keydown", e => {
   const tag = e.target.tagName;
   if (tag === "INPUT" || tag === "TEXTAREA") return;
   const k = keyMap[e.key.toLowerCase()];
   if (k) { keys[k] = true; e.preventDefault(); }
 });
-
 window.addEventListener("keyup", e => {
   const tag = e.target.tagName;
   if (tag === "INPUT" || tag === "TEXTAREA") return;
@@ -653,18 +732,18 @@ canvas.addEventListener("mousemove", e => {
   const me = serverState.players[myId];
   if (!me) return;
   const wx = e.clientX - rect.left + cam.x;
-  const wy = e.clientY - rect.top  + cam.y;
+  const wy = e.clientY - rect.top + cam.y;
   myAngle = Math.atan2(wy - me.y, wx - me.x);
 });
-
 canvas.addEventListener("mousedown", e => {
-  if (e.button !== 0) return;
-  if (!gameStarted || !myId || !socket) return;
+  if (e.button !== 0 || !gameStarted || !myId || !socket) return;
+  const me = serverState.players[myId];
+  if (!me || !me.alive) return;
   socket.emit("shoot", { angle: myAngle });
 });
 
 // ==================================================================
-//  INPUT → serveur
+//  INPUT serveur
 // ==================================================================
 setInterval(() => {
   if (!gameStarted || !myId || !socket) return;
@@ -674,7 +753,7 @@ setInterval(() => {
 }, 33);
 
 // ==================================================================
-//  CANVAS GAME
+//  CANVAS
 // ==================================================================
 function resizeCanvas() {
   canvas.width = window.innerWidth;
@@ -684,21 +763,123 @@ window.addEventListener("resize", resizeCanvas);
 resizeCanvas();
 
 function getCamera() {
-  const me = serverState.players[myId];
-  if (!me) return { x: 0, y: 0 };
-  return {
-    x: me.x - canvas.width / 2,
-    y: me.y - canvas.height / 2
-  };
+  // En mode spectateur, suivre la cible
+  const target = spectating ? serverState.players[spectating] : serverState.players[myId];
+  if (!target) return { x: 0, y: 0 };
+  return { x: target.x - canvas.width / 2, y: target.y - canvas.height / 2 };
 }
 
 // ==================================================================
 //  RENDU
 // ==================================================================
+const BIOME_COLORS = {
+  grass:  { bg: "#1d3a1a", accent: "#2d5a28", tree: "#0f2410" },
+  desert: { bg: "#5a4a2a", accent: "#7a6038", tree: "#3a2a1a" },
+  snow:   { bg: "#2a3a4a", accent: "#4a5a6a", tree: "#1a2a3a" },
+  water:  { bg: "#0a2040", accent: "#1a3560", tree: "#000000" }
+};
+
+function drawBiomes() {
+  const md = serverState.mapData;
+  if (!md) return;
+  const cam = getCamera();
+
+  // Fond par défaut
+  ctx.fillStyle = "#0f1a10";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Biomes
+  md.biomes.forEach(b => {
+    const colors = BIOME_COLORS[b.type] || BIOME_COLORS.grass;
+    const x = b.x - cam.x, y = b.y - cam.y;
+    const grad = ctx.createRadialGradient(x, y, 0, x, y, b.r);
+    grad.addColorStop(0, colors.accent);
+    grad.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(x, y, b.r, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
+function drawRivers() {
+  const md = serverState.mapData;
+  if (!md) return;
+  const cam = getCamera();
+  md.rivers.forEach(r => {
+    ctx.strokeStyle = "rgba(30, 80, 150, 0.8)";
+    ctx.lineWidth = r.width;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    r.points.forEach((p, i) => {
+      const x = p.x - cam.x, y = p.y - cam.y;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    // Reflet
+    ctx.strokeStyle = "rgba(100, 180, 255, 0.3)";
+    ctx.lineWidth = r.width * 0.4;
+    ctx.stroke();
+  });
+}
+
+function drawForests() {
+  const md = serverState.mapData;
+  if (!md) return;
+  const cam = getCamera();
+  md.forests.forEach(f => {
+    f.forEach(t => {
+      const x = t.x - cam.x, y = t.y - cam.y;
+      if (x < -50 || x > canvas.width + 50 || y < -50 || y > canvas.height + 50) return;
+      // Ombre
+      ctx.fillStyle = "rgba(0,0,0,0.4)";
+      ctx.beginPath();
+      ctx.arc(x + 4, y + 6, t.r, 0, Math.PI * 2);
+      ctx.fill();
+      // Arbre
+      ctx.fillStyle = "#0f2410";
+      ctx.beginPath();
+      ctx.arc(x, y, t.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#2d5a28";
+      ctx.beginPath();
+      ctx.arc(x - 3, y - 3, t.r * 0.75, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  });
+}
+
+function drawWalls() {
+  const md = serverState.mapData;
+  if (!md) return;
+  const cam = getCamera();
+  md.walls.forEach(w => {
+    const x = w.x - cam.x, y = w.y - cam.y;
+    if (x + w.w < 0 || x > canvas.width || y + w.h < 0 || y > canvas.height) return;
+
+    // Ombre
+    ctx.fillStyle = "rgba(0,0,0,0.5)";
+    ctx.fillRect(x + 4, y + 6, w.w, w.h);
+    // Corps
+    ctx.fillStyle = "#3a3a4a";
+    ctx.fillRect(x, y, w.w, w.h);
+    // Bordure
+    ctx.strokeStyle = "#5a5a7a";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(x, y, w.w, w.h);
+    // Reflet
+    ctx.fillStyle = "rgba(255,255,255,0.06)";
+    ctx.fillRect(x, y, w.w, 6);
+  });
+}
+
 function drawGrid() {
   const cam = getCamera();
   const g = 100;
-  ctx.strokeStyle = "rgba(255,255,255,0.04)";
+  ctx.strokeStyle = "rgba(255,255,255,0.025)";
   ctx.lineWidth = 1;
   const sx = Math.floor(cam.x / g) * g;
   const sy = Math.floor(cam.y / g) * g;
@@ -731,12 +912,10 @@ function drawZones() {
   const time = Date.now() / 1000;
   serverState.zones.forEach(z => {
     const info = ZONE_COLORS[z.type] || ZONE_COLORS.heal;
-    const x = z.x - cam.x;
-    const y = z.y - cam.y;
+    const x = z.x - cam.x, y = z.y - cam.y;
     const pulse = 1 + Math.sin(time * 2 + z.x * 0.01) * 0.05;
     const r = z.radius * pulse;
 
-    // Halo extérieur
     const grad = ctx.createRadialGradient(x, y, r * 0.3, x, y, r);
     grad.addColorStop(0, info.glow);
     grad.addColorStop(1, "rgba(0,0,0,0)");
@@ -745,7 +924,6 @@ function drawZones() {
     ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.fill();
 
-    // Anneau
     ctx.strokeStyle = info.main;
     ctx.lineWidth = 3;
     ctx.setLineDash([10, 8]);
@@ -755,7 +933,18 @@ function drawZones() {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Label
+    // Si mobile, flèche directionnelle
+    if (z.moving) {
+      const arrowLen = 40;
+      const a = Math.atan2(z.vy, z.vx);
+      ctx.strokeStyle = info.main;
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + Math.cos(a) * arrowLen, y + Math.sin(a) * arrowLen);
+      ctx.stroke();
+    }
+
     ctx.fillStyle = info.main;
     ctx.font = "bold 13px Segoe UI, Arial";
     ctx.textAlign = "center";
@@ -768,13 +957,11 @@ function drawPlayer(p, isMe) {
   const cam = getCamera();
   const x = p.x - cam.x, y = p.y - cam.y;
 
-  // Ombre
   ctx.fillStyle = "rgba(0,0,0,0.3)";
   ctx.beginPath();
   ctx.ellipse(x, y + 6, 32, 12, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Aura shield
   if (p.shield > 0) {
     ctx.strokeStyle = "rgba(255,221,68,0.8)";
     ctx.lineWidth = 3;
@@ -782,8 +969,6 @@ function drawPlayer(p, isMe) {
     ctx.arc(x, y, 40, 0, Math.PI * 2);
     ctx.stroke();
   }
-
-  // Aura speed
   if (p.speedBoost > 0) {
     ctx.strokeStyle = "rgba(68,170,255,0.6)";
     ctx.lineWidth = 2;
@@ -794,25 +979,23 @@ function drawPlayer(p, isMe) {
     ctx.setLineDash([]);
   }
 
-  // Tank
   ctx.save();
   ctx.translate(x, y);
   drawTankShape(ctx, p.skin, p.angle);
   ctx.restore();
 
-  // Nom
   ctx.fillStyle = isMe ? "#4af" : "#fff";
   ctx.font = "bold 13px Segoe UI, Arial";
   ctx.textAlign = "center";
   ctx.fillText(p.pseudo, x, y - 50);
 
-  if (p.realName) {
-    ctx.fillStyle = "#789";
-    ctx.font = "italic 11px Segoe UI, Arial";
-    ctx.fillText(p.realName, x, y - 36);
+  // Œil + compteur spectateurs
+  if (p.spectators > 0) {
+    ctx.fillStyle = "#fd4";
+    ctx.font = "bold 12px Segoe UI, Arial";
+    ctx.fillText(`👁 ${p.spectators}`, x, y - 66);
   }
 
-  // HP bar
   const bw = 52, bh = 5;
   ctx.fillStyle = "rgba(0,0,0,0.6)";
   ctx.fillRect(x - bw / 2, y - 30, bw, bh);
@@ -838,7 +1021,8 @@ function drawScoreboard() {
   const list = Object.values(serverState.players).sort((a, b) => b.hp - a.hp);
   el.innerHTML = list.map(p => {
     const c = p.alive ? (p.id === myId ? "#4af" : "#ddd") : "#f55";
-    return `<div style="color:${c}">${p.pseudo} — ${p.alive ? Math.round(p.hp) + " HP" : "💀"}</div>`;
+    const spec = p.spectators > 0 ? ` <span style="color:#fd4">👁${p.spectators}</span>` : "";
+    return `<div style="color:${c}">${p.pseudo} — ${p.alive ? Math.round(p.hp) + " HP" : "💀"}${spec}</div>`;
   }).join("");
 }
 
@@ -849,65 +1033,84 @@ function drawZoneIndicator() {
   const chips = [];
   if (me.shield > 0) chips.push(`<div class="zone-chip" style="color:#fd4;border-color:#fd4">🛡 BOUCLIER ${Math.ceil(me.shield / 60)}s</div>`);
   if (me.speedBoost > 0) chips.push(`<div class="zone-chip" style="color:#4af;border-color:#4af">⚡ VITESSE</div>`);
+  if (me.damageBoost > 0) chips.push(`<div class="zone-chip" style="color:#f55;border-color:#f55">💥 DÉGÂTS +</div>`);
   el.innerHTML = chips.join("");
+}
+
+function drawAnnouncement() {
+  const el = $("announcement");
+  if (serverState.announcement) {
+    el.textContent = serverState.announcement;
+    el.classList.remove("hidden");
+  } else {
+    el.classList.add("hidden");
+  }
+}
+
+function drawMinimap() {
+  const size = minimap.width;
+  const scale = size / 3200;
+  mmCtx.clearRect(0, 0, size, size);
+  mmCtx.fillStyle = "rgba(10, 20, 40, 0.85)";
+  mmCtx.fillRect(0, 0, size, size);
+
+  // Murs
+  if (serverState.mapData) {
+    mmCtx.fillStyle = "rgba(150, 150, 180, 0.5)";
+    serverState.mapData.walls.forEach(w => {
+      mmCtx.fillRect(w.x * scale, w.y * scale, w.w * scale, w.h * scale);
+    });
+    // Rivières
+    mmCtx.strokeStyle = "rgba(80, 140, 220, 0.6)";
+    mmCtx.lineWidth = 2;
+    serverState.mapData.rivers.forEach(r => {
+      mmCtx.beginPath();
+      r.points.forEach((p, i) => {
+        if (i === 0) mmCtx.moveTo(p.x * scale, p.y * scale);
+        else mmCtx.lineTo(p.x * scale, p.y * scale);
+      });
+      mmCtx.stroke();
+    });
+  }
+
+  // Zones
+  serverState.zones.forEach(z => {
+    const info = ZONE_COLORS[z.type] || ZONE_COLORS.heal;
+    mmCtx.strokeStyle = info.main;
+    mmCtx.lineWidth = 2;
+    mmCtx.beginPath();
+    mmCtx.arc(z.x * scale, z.y * scale, z.radius * scale, 0, Math.PI * 2);
+    mmCtx.stroke();
+  });
+
+  // Joueurs
+  Object.values(serverState.players).forEach(p => {
+    if (!p.alive) return;
+    mmCtx.fillStyle = p.id === myId ? "#4af" : (spectating === p.id ? "#fd4" : "#fff");
+    mmCtx.beginPath();
+    mmCtx.arc(p.x * scale, p.y * scale, p.id === myId ? 4 : 3, 0, Math.PI * 2);
+    mmCtx.fill();
+  });
 }
 
 function loop() {
   if (gameStarted) {
-    ctx.fillStyle = "#0a0e27";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    drawBiomes();
+    drawRivers();
     drawGrid();
+    drawWalls();
+    drawForests();
     drawZones();
+
     Object.values(serverState.players).forEach(p => {
       if (p.alive) drawPlayer(p, p.id === myId);
     });
     drawBullets();
     drawScoreboard();
     drawZoneIndicator();
+    drawAnnouncement();
+    drawMinimap();
   }
   requestAnimationFrame(loop);
 }
 loop();
-
-// ==================================================================
-//  MENU BACKGROUND
-// ==================================================================
-(function initMenuBg() {
-  const c = $("menuCanvas");
-  if (!c) return;
-  const g = c.getContext("2d");
-  let running = true;
-  function resize() {
-    c.width = window.innerWidth;
-    c.height = window.innerHeight;
-  }
-  resize();
-  window.addEventListener("resize", resize);
-
-  const stars = [];
-  for (let i = 0; i < 120; i++) {
-    stars.push({
-      x: Math.random() * c.width,
-      y: Math.random() * c.height,
-      r: Math.random() * 1.4 + 0.3,
-      alpha: Math.random() * 0.7 + 0.3,
-      speed: Math.random() * 0.3 + 0.05
-    });
-  }
-
-  function loop() {
-    if (!running) return;
-    g.fillStyle = "rgba(3, 4, 13, 0.3)";
-    g.fillRect(0, 0, c.width, c.height);
-    stars.forEach(s => {
-      s.y += s.speed;
-      if (s.y > c.height) { s.y = 0; s.x = Math.random() * c.width; }
-      g.fillStyle = `rgba(180, 220, 255, ${s.alpha})`;
-      g.beginPath();
-      g.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-      g.fill();
-    });
-    requestAnimationFrame(loop);
-  }
-  loop();
-})();

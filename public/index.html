@@ -8,47 +8,73 @@
 </head>
 <body>
 
-<!-- ==================== SPLASH ==================== -->
+<!-- ============ SPLASH ============ -->
 <div id="splashScreen" class="screen splash-screen">
   <canvas id="galaxyCanvas"></canvas>
-  <div class="splash-overlay"></div>
   <div class="splash-content">
     <div class="splash-logo-wrap">
       <div class="splash-ring"></div>
       <div class="splash-ring splash-ring-2"></div>
-      <img src="assets/stellar.png" alt="Stellar Game" class="splash-logo">
+      <img src="assets/stellar.png" class="splash-logo">
     </div>
     <div class="splash-title">STELLAR&nbsp;GAME</div>
-    <div class="splash-tagline">DÉCOLLAGE IMMINENT</div>
+    <div class="splash-tagline">CHARGEMENT DE LA GALAXIE</div>
     <div class="splash-loader"><div class="splash-loader-bar"></div></div>
-    <div class="splash-version">v1.0 — GALAXY EDITION</div>
   </div>
 </div>
 
-<!-- ==================== LOGIN ==================== -->
-<div id="loginScreen" class="screen login-screen hidden">
-  <canvas id="loginCanvas"></canvas>
+<!-- ============ PROFILES ============ -->
+<div id="profilesScreen" class="screen profiles-screen hidden">
+  <canvas id="profilesCanvas"></canvas>
+
+  <div class="profiles-header">
+    <img src="assets/stellar.png" class="mini-logo">
+    <h1>CHOISIS TON PROFIL</h1>
+    <p class="muted">Sélectionne un compte ou crées-en un nouveau</p>
+  </div>
+
+  <div class="profiles-content">
+    <div id="accountList" class="account-list"></div>
+
+    <div class="account-right">
+      <div class="selected-preview">
+        <canvas id="previewCanvas" width="220" height="220"></canvas>
+        <div id="previewPseudo" class="preview-pseudo">—</div>
+        <div id="previewReal" class="preview-real">—</div>
+        <button id="enterLobbyBtn" class="btn btn-green" disabled>JOUER AVEC CE COMPTE</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="profiles-footer">
+    <button id="newAccountBtn" class="btn btn-yellow">+ NOUVEAU COMPTE</button>
+  </div>
+</div>
+
+<!-- ============ NEW ACCOUNT ============ -->
+<div id="newAccountScreen" class="screen new-account-screen hidden">
+  <canvas id="newAccountCanvas"></canvas>
+
   <div class="login-box">
     <div class="login-glow"></div>
-    <img src="assets/stellar.png" alt="Stellar Game" class="login-logo">
-    <h1>IDENTIFICATION</h1>
-    <p class="login-sub">Crée ton profil de pilote</p>
+    <img src="assets/stellar.png" class="login-logo">
+    <h1>NOUVEAU PILOTE</h1>
+    <p class="login-sub">Crée ton profil</p>
 
-    <label for="pseudoInput">Pseudo (5 car. min.)</label>
-    <input id="pseudoInput" type="text" maxlength="16"
-           placeholder="Ton pseudo de pilote" autocomplete="off" spellcheck="false">
+    <label>Pseudo (5 car. min.)</label>
+    <input id="pseudoInput" type="text" maxlength="16" autocomplete="off" spellcheck="false">
     <div id="pseudoError" class="error-msg"></div>
 
-    <label for="realNameInput">Nom réel</label>
-    <input id="realNameInput" type="text" maxlength="32"
-           placeholder="Ton vrai nom" autocomplete="off" spellcheck="false">
+    <label>Nom réel</label>
+    <input id="realNameInput" type="text" maxlength="32" autocomplete="off" spellcheck="false">
 
-    <button id="loginBtn" class="btn btn-green" disabled>CONTINUER 🚀</button>
+    <button id="createAccountBtn" class="btn btn-green" disabled>CRÉER</button>
+    <button id="backToProfilesBtn" class="btn btn-red">ANNULER</button>
   </div>
 </div>
 
-<!-- ==================== MAIN MENU ==================== -->
-<div id="mainMenuScreen" class="screen main-menu-screen hidden">
+<!-- ============ MAIN MENU ============ -->
+<div id="mainMenuScreen" class="screen hidden">
   <canvas id="menuCanvas"></canvas>
 
   <div class="top-bar">
@@ -61,7 +87,7 @@
         <span id="userPseudo">—</span>
         <span id="userReal" class="user-real">—</span>
       </div>
-      <button id="settingsBtn" class="icon-btn" title="Paramètres">⚙️</button>
+      <button id="disconnectBtn" class="icon-btn" title="Déconnexion">🚪</button>
     </div>
   </div>
 
@@ -76,7 +102,7 @@
   </div>
 </div>
 
-<!-- ==================== SERVER BROWSER ==================== -->
+<!-- ============ SERVER BROWSER ============ -->
 <div id="serverBrowser" class="screen hidden">
   <div class="browser-header">
     <button id="closeBrowser" class="icon-btn">←</button>
@@ -89,35 +115,28 @@
     <button class="tab-btn" data-tab="create">CRÉER</button>
   </div>
 
-  <!-- Rejoindre -->
   <div id="tab-join" class="tab-panel">
     <div class="join-by-code">
-      <input id="codeInput" type="text" maxlength="5"
-             placeholder="CODE (ex: A4F9K)" autocomplete="off" spellcheck="false">
+      <input id="codeInput" type="text" maxlength="5" placeholder="CODE" autocomplete="off">
       <button id="joinByCodeBtn" class="btn btn-green small">REJOINDRE</button>
     </div>
-
     <div class="refresh-row">
       <button id="refreshRooms" class="btn-refresh">🔄 Rafraîchir</button>
-      <span id="roomsCount" class="muted">— serveurs disponibles</span>
+      <span id="roomsCount" class="muted">—</span>
     </div>
-
     <div id="roomsList" class="rooms-list"></div>
   </div>
 
-  <!-- Créer -->
   <div id="tab-create" class="tab-panel hidden">
     <div class="create-form">
       <label>Nom du serveur</label>
-      <input id="serverNameInput" type="text" maxlength="24"
-             placeholder="Mon serveur" autocomplete="off">
-      <button id="createRoomBtn" class="btn btn-green">CRÉER LE SERVEUR</button>
-      <p class="muted small">Un code à 5 caractères sera généré automatiquement.</p>
+      <input id="serverNameInput" type="text" maxlength="24" placeholder="Mon serveur">
+      <button id="createRoomBtn" class="btn btn-green">CRÉER</button>
     </div>
   </div>
 </div>
 
-<!-- ==================== LOBBY ==================== -->
+<!-- ============ LOBBY ============ -->
 <div id="lobbyScreen" class="screen hidden">
   <div class="top-bar">
     <div class="logo">
@@ -125,10 +144,7 @@
       <span>STELLAR GAME</span>
     </div>
     <div class="top-actions">
-      <div class="room-code-chip">
-        CODE : <strong id="roomCodeDisplay">—</strong>
-      </div>
-      <button id="settingsBtn2" class="icon-btn" title="Paramètres">⚙️</button>
+      <div class="room-code-chip">CODE : <strong id="roomCodeDisplay">—</strong></div>
     </div>
   </div>
 
@@ -143,30 +159,52 @@
   </div>
 </div>
 
-<!-- ==================== GAME ==================== -->
+<!-- ============ GAME ============ -->
 <div id="gameScreen" class="screen hidden">
   <canvas id="game"></canvas>
+
   <div id="hud">
     <button id="leaveGameBtn" class="icon-btn" title="Retour au salon">←</button>
     <div id="scoreboard"></div>
     <div id="zoneIndicator"></div>
+
+    <!-- MINI MAP -->
+    <canvas id="minimap" width="180" height="180"></canvas>
+
+    <!-- BANDEAU ANNONCE -->
+    <div id="announcement" class="announcement hidden"></div>
+  </div>
+
+  <!-- DEATH SCREEN -->
+  <div id="deathScreen" class="death-screen hidden">
+    <div class="death-content">
+      <h1>TU ES MORT</h1>
+      <p class="death-sub">Éliminé au combat</p>
+      <div class="death-buttons">
+        <button id="backToLobbyBtn" class="btn btn-green">RETOUR AU SALON</button>
+        <button id="spectateBtn" class="btn btn-yellow">👁 SPECTATEUR</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SPECTATE PANEL -->
+  <div id="spectatePanel" class="spectate-panel hidden">
+    <div class="spectate-title">👁 MODE SPECTATEUR</div>
+    <div id="spectateList" class="spectate-list"></div>
+    <button id="stopSpectateBtn" class="btn btn-red">STOP</button>
   </div>
 </div>
 
-<!-- ==================== SETTINGS ==================== -->
+<!-- ============ SETTINGS ============ -->
 <div id="settingsModal" class="modal hidden">
   <div class="modal-content">
     <h2>Paramètres</h2>
-
     <label>Pseudo</label>
     <input id="settingsPseudo" type="text" maxlength="16">
-
     <label>Nom réel</label>
     <input id="settingsRealName" type="text" maxlength="32">
-
     <label>Skin</label>
     <div id="skinPicker" class="skins-row"></div>
-
     <button id="closeSettings" class="btn btn-green">FERMER</button>
   </div>
 </div>
