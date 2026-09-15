@@ -30,15 +30,13 @@ const tank = {
     x: window.innerWidth / 2,
     y: window.innerHeight / 2,
     speed: 4,
-    angle: 0,     // Angle vers la souris
-    width: 100,
-    height: 100
+    angle: 0,
+    bodyAngle: 0,
+    width: 120,
+    height: 120
 };
 
-// Tableau des projectiles
-const bullets = [];
-
-// Charger l'image complète du tank (sprite sheet)
+// Charger l'image du tank 2D
 const tankImage = new Image();
 tankImage.src = 'assets/Gemini_Generated_Image_7sx5q27sx5q27sx5-removebg-preview.png';
 
@@ -53,22 +51,7 @@ window.addEventListener('mousemove', (e) => {
     mouseY = e.clientY;
 });
 
-// Tirer un projectile au clic gauche
-window.addEventListener('mousedown', (e) => {
-    if (!gameStarted) return;
-    if (e.button === 0) {
-        const bulletSpeed = 12;
-        bullets.push({
-            x: tank.x + Math.cos(tank.angle) * 35,
-            y: tank.y + Math.sin(tank.angle) * 35,
-            vx: Math.cos(tank.angle) * bulletSpeed,
-            vy: Math.sin(tank.angle) * bulletSpeed,
-            angle: tank.angle
-        });
-    }
-});
-
-// 1. Cinématique d'introduction
+// 1. Script de la cinématique d'introduction au chargement de la page
 window.addEventListener('DOMContentLoaded', () => {
     const fullText = "Merci d'avoir rejoint mon jeu ! 🚀";
     let charIndex = 0;
@@ -102,7 +85,7 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// 2. Connexion / Pseudo
+// 2. Gestion de la validation du pseudo
 function handleLogin() {
     const pseudo = usernameInput.value.trim();
     if (pseudo === "") {
@@ -112,9 +95,11 @@ function handleLogin() {
     }
 
     playerPseudo = pseudo;
+
     loginScreen.style.opacity = '0';
     setTimeout(() => {
         loginScreen.style.display = 'none';
+
         animatedGreeting.textContent = `Bonjour, ${playerPseudo} ! 🚀`;
         welcomeMessageOverlay.style.display = 'flex';
 
@@ -122,6 +107,7 @@ function handleLogin() {
             welcomeMessageOverlay.style.opacity = '0';
             setTimeout(() => {
                 welcomeMessageOverlay.style.display = 'none';
+
                 splashScreen.style.display = 'block';
                 setTimeout(() => {
                     splashScreen.style.opacity = '1';
@@ -133,9 +119,12 @@ function handleLogin() {
 
 validateBtn.addEventListener('click', handleLogin);
 usernameInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') handleLogin();
+    if (e.key === 'Enter') {
+        handleLogin();
+    }
 });
 
+// Gestion des connexions Socket.io
 socket.on('connect', () => {
     serverStatus.className = "status-online";
     statusText.textContent = "Serveur en ligne (Connecté)";
@@ -146,6 +135,7 @@ socket.on('disconnect', () => {
     statusText.textContent = "Serveur déconnecté - Reconnexion...";
 });
 
+// Bouton Jouer : Masque le menu et lance la boucle du jeu
 startBtn.addEventListener('click', () => {
     splashScreen.style.opacity = '0';
     setTimeout(() => {
@@ -163,6 +153,7 @@ function resizeCanvas() {
 }
 window.addEventListener('resize', resizeCanvas);
 
+// Bouton Paramètres
 settingsBtn.addEventListener('click', () => {
     alert("Les paramètres du jeu seront bientôt disponibles !");
 });
@@ -171,97 +162,42 @@ settingsBtn.addEventListener('click', () => {
 function gameLoop() {
     if (!gameStarted) return;
 
-    // --- MOUVEMENTS ZQSD ---
-    if (keys['z'] || keys['arrowup']) tank.y -= tank.speed;
-    if (keys['s'] || keys['arrowdown']) tank.y += tank.speed;
-    if (keys['q'] || keys['arrowleft']) tank.x -= tank.speed;
-    if (keys['d'] || keys['arrowright']) tank.x += tank.speed;
+    let moving = false;
+    let moveAngle = tank.bodyAngle;
 
-    // --- VISÉE SOURIS ---
+    if (keys['z'] || keys['arrowup']) { tank.y -= tank.speed; moving = true; moveAngle = -Math.PI / 2; }
+    if (keys['s'] || keys['arrowdown']) { tank.y += tank.speed; moving = true; moveAngle = Math.PI / 2; }
+    if (keys['q'] || keys['arrowleft']) { tank.x -= tank.speed; moving = true; moveAngle = Math.PI; }
+    if (keys['d'] || keys['arrowright']) { tank.x += tank.speed; moving = true; moveAngle = 0; }
+
+    if ((keys['z'] || keys['arrowup']) && (keys['d'] || keys['arrowright'])) moveAngle = -Math.PI / 4;
+    if ((keys['z'] || keys['arrowup']) && (keys['q'] || keys['arrowleft'])) moveAngle = -3 * Math.PI / 4;
+    if ((keys['s'] || keys['arrowdown']) && (keys['d'] || keys['arrowright'])) moveAngle = Math.PI / 4;
+    if ((keys['s'] || keys['arrowdown']) && (keys['q'] || keys['arrowleft'])) moveAngle = 3 * Math.PI / 4;
+
+    if (moving) {
+        tank.bodyAngle = moveAngle;
+    }
+
     const dx = mouseX - tank.x;
     const dy = mouseY - tank.y;
     tank.angle = Math.atan2(dy, dx);
 
-    // --- MISE A JOUR DES PROJECTILES ---
-    for (let i = bullets.length - 1; i >= 0; i--) {
-        bullets[i].x += bullets[i].vx;
-        bullets[i].y += bullets[i].vy;
-
-        if (bullets[i].x < 0 || bullets[i].x > canvas.width || bullets[i].y < 0 || bullets[i].y > canvas.height) {
-            bullets.splice(i, 1);
-        }
-    }
-
-    // --- RENDU GRAPHIQUE ---
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Dessiner les projectiles énergétiques
-    for (let b of bullets) {
-        ctx.save();
-        ctx.translate(b.x, b.y);
-        ctx.rotate(b.angle);
-        
-        ctx.fillStyle = '#38bdf8';
-        ctx.shadowBlur = 12;
-        ctx.shadowColor = '#38bdf8';
-        ctx.fillRect(-12, -4, 24, 8);
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(-4, -2, 8, 4);
-        
-        ctx.restore();
-    }
+    ctx.save();
+    ctx.translate(tank.x, tank.y);
+    ctx.rotate(tank.angle);
 
-    // --- UTILISATION DES SPRITES PRÉ-DESSINÉS DU CERCLE (8 DIRECTIONS) ---
     if (tankImage.complete) {
-        ctx.save();
-        ctx.translate(tank.x, tank.y);
-
-        // Calculer l'angle en degrés (0 à 360) par rapport à la souris
-        let deg = (tank.angle * 180 / Math.PI + 360) % 360;
-
-        // Découper le cercle en 8 tranches de 45° pour sélectionner l'index du mini-tank (0 à 7)
-        let frameIndex = Math.floor((deg + 22.5) / 45) % 8;
-
-        // Définition des coordonnées des 8 mini-tanks du cercle dans ton image source
-        // (Ces valeurs ciblent directement la zone de droite où se trouvent les mini-tanks en cercle)
-        // Note : Si ton image fait par exemple 1000x1000, ces proportions s'adaptent, ou tu pourras affiner selon les pixels exacts.
-        const totalW = tankImage.width;
-        const totalH = tankImage.height;
-
-        // Coordonnées approximatives du cercle des 8 tanks situés sur la moitié droite de l'image
-        // On définit le centre du cercle des mini-tanks et leur taille
-        const wheelCenterX = totalW * 0.75;
-        const wheelCenterY = totalH * 0.5;
-        const radiusOffset = totalW * 0.18; // Éloignement par rapport au centre du cercle
-
-        // Angles de chaque position dans le cercle source (en radians)
-        const sourceAngles = [
-            -Math.PI / 2,           // 0: Haut (12h)
-            -Math.PI / 4,           // 1: Haut-Droite (1h30)
-            0,                      // 2: Droite (3h)
-            Math.PI / 4,            // 3: Bas-Droite (4h30)
-            Math.PI / 2,            // 4: Bas (6h)
-            3 * Math.PI / 4,        // 5: Bas-Gauche (7h30)
-            Math.PI,                // 6: Gauche (9h)
-            -3 * Math.PI / 4        // 7: Haut-Gauche (10h30)
-        ];
-
-        const targetAngle = sourceAngles[frameIndex];
-        
-        // Taille d'un mini-tank dans la grille de droite (environ 18% de la largeur totale)
-        const miniTankSize = totalW * 0.18; 
-        const srcX = wheelCenterX + Math.cos(targetAngle) * radiusOffset - miniTankSize / 2;
-        const srcY = wheelCenterY + Math.sin(targetAngle) * radiusOffset - miniTankSize / 2;
-
-        // Dessiner le mini-tank correspondant à la direction de la souris sur le joueur
         ctx.drawImage(
             tankImage, 
-            srcX, srcY, miniTankSize, miniTankSize, 
+            0, 0, tankImage.width / 2, tankImage.height, 
             -tank.width / 2, -tank.height / 2, tank.width, tank.height
         );
-
-        ctx.restore();
     }
+
+    ctx.restore();
 
     requestAnimationFrame(gameLoop);
 }
