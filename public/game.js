@@ -31,8 +31,8 @@ const tank = {
     y: window.innerHeight / 2,
     speed: 4,
     angle: 0,     // Angle vers la souris
-    width: 110,
-    height: 110
+    width: 100,
+    height: 100
 };
 
 // Tableau des projectiles
@@ -188,18 +188,14 @@ function gameLoop() {
         bullets[i].y += bullets[i].vy;
 
         if (bullets[i].x < 0 || bullets[i].x > canvas.width || bullets[i].y < 0 || bullets[i].y > canvas.height) {
-            bullets[i] = null;
+            bullets.splice(i, 1);
         }
-    }
-    // Nettoyage du tableau des bullets nulles
-    for (let i = bullets.length - 1; i >= 0; i--) {
-        if (!bullets[i]) bullets.splice(i, 1);
     }
 
     // --- RENDU GRAPHIQUE ---
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Dessiner les projectiles
+    // Dessiner les projectiles énergétiques
     for (let b of bullets) {
         ctx.save();
         ctx.translate(b.x, b.y);
@@ -215,43 +211,52 @@ function gameLoop() {
         ctx.restore();
     }
 
-    // --- DESSINER LE TANK UTILISANT LES SPRITES DU CERCLE DE ROTATION ---
+    // --- UTILISATION DES SPRITES PRÉ-DESSINÉS DU CERCLE (8 DIRECTIONS) ---
     if (tankImage.complete) {
         ctx.save();
         ctx.translate(tank.x, tank.y);
 
-        // Convertir l'angle en degrés (0 à 360)
-        let degrees = (tank.angle * 180 / Math.PI + 360) % 360;
-        
-        // Découper l'angle en 8 directions correspondant aux 8 mini-tanks du cercle de droite
-        // 0 = Haut, 1 = Haut-Droite, 2 = Droite, 3 = Bas-Droite, 4 = Bas, 5 = Bas-Gauche, 6 = Gauche, 7 = Haut-Gauche
-        let indexDir = Math.round(degrees / 45) % 8;
+        // Calculer l'angle en degrés (0 à 360) par rapport à la souris
+        let deg = (tank.angle * 180 / Math.PI + 360) % 360;
 
-        // Coordonnées approximatives des mini-tanks dans le cercle de ton image (à adapter selon les proportions exactes de ton image source)
-        // Les dimensions globales de l'image source
-        const imgW = tankImage.width;
-        const imgH = tankImage.height;
+        // Découper le cercle en 8 tranches de 45° pour sélectionner l'index du mini-tank (0 à 7)
+        let frameIndex = Math.floor((deg + 22.5) / 45) % 8;
 
-        // Position du cercle de droite (exemple basé sur ton image : les mini-tanks sont dans la moitié droite)
-        // On découpe la grille des mini-tanks du cercle de droite selon l'indexDir
-        // Note: Tu peux soit utiliser le grand tank de gauche et faire une rotation classique, 
-        // soit mapper précisément les coordonnées de chaque mini-tank du cercle de droite.
-        
-        // Alternative plus simple et ultra fluide : 
-        // On utilise le gros tank de gauche (qui est bien dessiné de face) et on fait pivoter *uniquement* 
-        // l'image source du gros tank par rapport à son axe de tourelle, ou on utilise le cercle.
-        
-        // Ici, affichons le gros tank de gauche de manière fixe ou en rotation propre sans le "truc en trop" :
-        const srcX = 0;
-        const srcY = 0;
-        const srcWidth = imgW * 0.46; // Coupe avant la roue de droite
-        const srcHeight = imgH;
+        // Définition des coordonnées des 8 mini-tanks du cercle dans ton image source
+        // (Ces valeurs ciblent directement la zone de droite où se trouvent les mini-tanks en cercle)
+        // Note : Si ton image fait par exemple 1000x1000, ces proportions s'adaptent, ou tu pourras affiner selon les pixels exacts.
+        const totalW = tankImage.width;
+        const totalH = tankImage.height;
 
-        // Rotation propre centrée sur le tank
-        ctx.rotate(tank.angle + Math.PI / 2);
+        // Coordonnées approximatives du cercle des 8 tanks situés sur la moitié droite de l'image
+        // On définit le centre du cercle des mini-tanks et leur taille
+        const wheelCenterX = totalW * 0.75;
+        const wheelCenterY = totalH * 0.5;
+        const radiusOffset = totalW * 0.18; // Éloignement par rapport au centre du cercle
+
+        // Angles de chaque position dans le cercle source (en radians)
+        const sourceAngles = [
+            -Math.PI / 2,           // 0: Haut (12h)
+            -Math.PI / 4,           // 1: Haut-Droite (1h30)
+            0,                      // 2: Droite (3h)
+            Math.PI / 4,            // 3: Bas-Droite (4h30)
+            Math.PI / 2,            // 4: Bas (6h)
+            3 * Math.PI / 4,        // 5: Bas-Gauche (7h30)
+            Math.PI,                // 6: Gauche (9h)
+            -3 * Math.PI / 4        // 7: Haut-Gauche (10h30)
+        ];
+
+        const targetAngle = sourceAngles[frameIndex];
+        
+        // Taille d'un mini-tank dans la grille de droite (environ 18% de la largeur totale)
+        const miniTankSize = totalW * 0.18; 
+        const srcX = wheelCenterX + Math.cos(targetAngle) * radiusOffset - miniTankSize / 2;
+        const srcY = wheelCenterY + Math.sin(targetAngle) * radiusOffset - miniTankSize / 2;
+
+        // Dessiner le mini-tank correspondant à la direction de la souris sur le joueur
         ctx.drawImage(
             tankImage, 
-            srcX, srcY, srcWidth, srcHeight, 
+            srcX, srcY, miniTankSize, miniTankSize, 
             -tank.width / 2, -tank.height / 2, tank.width, tank.height
         );
 
