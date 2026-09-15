@@ -32,16 +32,18 @@ function drawTankShape(ctx, skinId, angle = 0, scale = 1) {
   ctx.fillStyle = s.body;
   ctx.fillRect(-20, -13, 40, 26);
 
-  // Bande
+  // Bande d'accent
   ctx.fillStyle = s.accent;
   ctx.fillRect(-20, -2, 40, 4);
 
   // Tourelle
   ctx.beginPath();
   ctx.arc(0, 0, 11, 0, Math.PI * 2);
-  ctx.fillStyle = s.body; ctx.fill();
+  ctx.fillStyle = s.body;
+  ctx.fill();
   ctx.strokeStyle = s.accent;
-  ctx.lineWidth = 2.5; ctx.stroke();
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
 
   // Canon
   ctx.fillStyle = s.accent;

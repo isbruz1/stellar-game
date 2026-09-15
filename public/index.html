@@ -8,15 +8,52 @@
 </head>
 <body>
 
-<!-- ============ LOBBY ============ -->
-<div id="lobbyScreen" class="screen">
+<!-- ==================== SPLASH ==================== -->
+<div id="splashScreen" class="screen splash-screen">
+  <canvas id="splashCanvas"></canvas>
+  <div class="splash-content">
+    <img src="assets/stellar.png" alt="Stellar Game" class="splash-logo">
+    <div class="splash-tagline">PRÉPARATION DU DÉCOLLAGE…</div>
+    <div class="splash-loader">
+      <div class="splash-loader-bar"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== LOGIN ==================== -->
+<div id="loginScreen" class="screen login-screen hidden">
+  <div class="stars"></div>
+  <div class="login-box">
+    <img src="assets/stellar.png" alt="Stellar Game" class="login-logo">
+
+    <h1>CRÉE TON PROFIL</h1>
+    <p class="login-sub">Rejoins le salon principal</p>
+
+    <label for="pseudoInput">Pseudo</label>
+    <input id="pseudoInput" type="text" maxlength="16"
+           placeholder="5 caractères minimum" autocomplete="off" spellcheck="false">
+    <div id="pseudoError" class="error-msg"></div>
+
+    <label for="realNameInput">Nom réel</label>
+    <input id="realNameInput" type="text" maxlength="32"
+           placeholder="Ton nom" autocomplete="off" spellcheck="false">
+
+    <button id="loginBtn" class="btn btn-green" disabled>DÉCOLLER 🚀</button>
+  </div>
+</div>
+
+<!-- ==================== LOBBY ==================== -->
+<div id="lobbyScreen" class="screen hidden">
   <div class="top-bar">
-    <div class="logo">✦ STELLAR GAME</div>
+    <div class="logo">
+      <img src="assets/stellar.png" class="logo-img">
+      <span>STELLAR GAME</span>
+    </div>
     <button id="settingsBtn" class="icon-btn" title="Paramètres">⚙️</button>
   </div>
 
   <div class="lobby-content">
-    <h2>Salon <span id="playerCount">(0)</span></h2>
+    <h2>SALON PRINCIPAL <span id="playerCount">(0)</span></h2>
     <div class="players-grid" id="playersGrid"></div>
   </div>
 
@@ -26,7 +63,7 @@
   </div>
 </div>
 
-<!-- ============ GAME ============ -->
+<!-- ==================== GAME ==================== -->
 <div id="gameScreen" class="screen hidden">
   <canvas id="game"></canvas>
   <div id="hud">
@@ -35,14 +72,20 @@
   </div>
 </div>
 
-<!-- ============ SETTINGS ============ -->
+<!-- ==================== SETTINGS ==================== -->
 <div id="settingsModal" class="modal hidden">
   <div class="modal-content">
     <h2>Paramètres</h2>
+
     <label>Pseudo</label>
-    <input id="pseudoInput" type="text" maxlength="16" placeholder="Ton pseudo">
+    <input id="settingsPseudo" type="text" maxlength="16">
+
+    <label>Nom réel</label>
+    <input id="settingsRealName" type="text" maxlength="32">
+
     <label>Skin</label>
     <div id="skinPicker" class="skins-row"></div>
+
     <button id="closeSettings" class="btn btn-green">FERMER</button>
   </div>
 </div>

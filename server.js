@@ -5,14 +5,10 @@ const { Server } = require("socket.io");
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: { origin: "*" }
-});
+const io = new Server(server, { cors: { origin: "*" } });
 
-// ⚠️ On sert le dossier public/ (pas la racine)
 app.use(express.static(path.join(__dirname, "public")));
 
-// ----- Constantes -----
 const MAP_W = 2400, MAP_H = 2400;
 const PLAYER_RADIUS = 24;
 const PLAYER_SPEED = 3.4;
@@ -33,7 +29,13 @@ function publicPlayers() {
   const out = {};
   for (const id in players) {
     const p = players[id];
-    out[id] = { id, pseudo: p.pseudo, skin: p.skin, ready: p.ready };
+    out[id] = {
+      id,
+      pseudo: p.pseudo,
+      realName: p.realName,
+      skin: p.skin,
+      ready: p.ready
+    };
   }
   return out;
 }
@@ -44,14 +46,22 @@ function buildState() {
     const pl = players[id];
     p[id] = {
       id, x: pl.x, y: pl.y, angle: pl.angle,
-      skin: pl.skin, hp: pl.hp, alive: pl.alive, pseudo: pl.pseudo
+      skin: pl.skin, hp: pl.hp, alive: pl.alive,
+      pseudo: pl.pseudo, realName: pl.realName
     };
   }
-  return { players: p, bullets: bullets.map(b => ({ id: b.id, x: b.x, y: b.y })) };
+  return {
+    players: p,
+    bullets: bullets.map(b => ({ id: b.id, x: b.x, y: b.y }))
+  };
 }
 
 function broadcastLobby() {
-  io.emit("lobby-update", { players: publicPlayers(), hostId, gameStarted });
+  io.emit("lobby-update", {
+    players: publicPlayers(),
+    hostId,
+    gameStarted
+  });
 }
 
 function resetForGame() {
@@ -75,6 +85,7 @@ io.on("connection", socket => {
     players[socket.id] = {
       id: socket.id,
       pseudo: String(data.pseudo || "Joueur").slice(0, 16) || "Joueur",
+      realName: String(data.realName || "").slice(0, 32),
       skin: Number(data.skin) || 0,
       ready: false,
       x: MAP_W / 2, y: MAP_H / 2, angle: 0,
@@ -87,6 +98,13 @@ io.on("connection", socket => {
     const p = players[socket.id];
     if (!p) return;
     p.pseudo = String(pseudo).slice(0, 16) || "Joueur";
+    broadcastLobby();
+  });
+
+  socket.on("update-realname", name => {
+    const p = players[socket.id];
+    if (!p) return;
+    p.realName = String(name).slice(0, 32);
     broadcastLobby();
   });
 
@@ -158,14 +176,18 @@ io.on("connection", socket => {
       y: p.y + Math.sin(p.angle) * 34,
       vx: Math.cos(p.angle) * BULLET_SPEED,
       vy: Math.sin(p.angle) * BULLET_SPEED,
-      owner: socket.id, life: BULLET_LIFE
+      owner: socket.id,
+      life: BULLET_LIFE
     });
   });
 
   socket.on("disconnect", () => {
     delete players[socket.id];
     if (socket.id === hostId) hostId = Object.keys(players)[0] || null;
-    if (Object.keys(players).length === 0) { gameStarted = false; bullets = []; }
+    if (Object.keys(players).length === 0) {
+      gameStarted = false;
+      bullets = [];
+    }
     broadcastLobby();
   });
 });
@@ -207,6 +229,5 @@ function tick() {
 }
 setInterval(tick, 1000 / 60);
 
-// Render impose son propre PORT via process.env.PORT
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`✅ Serveur sur port ${PORT}`));
