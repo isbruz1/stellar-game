@@ -30,15 +30,16 @@ const tank = {
     x: window.innerWidth / 2,
     y: window.innerHeight / 2,
     speed: 4,
-    angle: 0,     // Angle vers la souris
-    width: 110,
-    height: 110
+    turretAngle: 0,   // Angle de la tourelle (vers la souris)
+    bodyAngle: 0,     // Angle du corps (direction ZQSD)
+    width: 100,
+    height: 100
 };
 
-// Tableau des projectiles
+// Tableau pour stocker tous les projectiles tirés
 const bullets = [];
 
-// Charger l'image complète du tank (sprite sheet)
+// Charger l'image du tank
 const tankImage = new Image();
 tankImage.src = 'assets/Gemini_Generated_Image_7sx5q27sx5q27sx5-removebg-preview.png';
 
@@ -53,22 +54,23 @@ window.addEventListener('mousemove', (e) => {
     mouseY = e.clientY;
 });
 
-// Tirer un projectile au clic gauche
+// Tirer un projectile au clic gauche de la souris
 window.addEventListener('mousedown', (e) => {
     if (!gameStarted) return;
-    if (e.button === 0) {
-        const bulletSpeed = 12;
+    if (e.button === 0) { // Clic gauche
+        // Calculer la vitesse du projectile selon l'angle de la tourelle
+        const bulletSpeed = 10;
         bullets.push({
-            x: tank.x + Math.cos(tank.angle) * 35,
-            y: tank.y + Math.sin(tank.angle) * 35,
-            vx: Math.cos(tank.angle) * bulletSpeed,
-            vy: Math.sin(tank.angle) * bulletSpeed,
-            angle: tank.angle
+            x: tank.x,
+            y: tank.y,
+            vx: Math.cos(tank.turretAngle) * bulletSpeed,
+            vy: Math.sin(tank.turretAngle) * bulletSpeed,
+            radius: 5
         });
     }
 });
 
-// 1. Cinématique d'introduction
+// 1. Script de la cinématique d'introduction au chargement
 window.addEventListener('DOMContentLoaded', () => {
     const fullText = "Merci d'avoir rejoint mon jeu ! 🚀";
     let charIndex = 0;
@@ -102,7 +104,7 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// 2. Connexion / Pseudo
+// 2. Validation du pseudo
 function handleLogin() {
     const pseudo = usernameInput.value.trim();
     if (pseudo === "") {
@@ -136,6 +138,7 @@ usernameInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') handleLogin();
 });
 
+// Connexion Socket.io
 socket.on('connect', () => {
     serverStatus.className = "status-online";
     statusText.textContent = "Serveur en ligne (Connecté)";
@@ -146,6 +149,7 @@ socket.on('disconnect', () => {
     statusText.textContent = "Serveur déconnecté - Reconnexion...";
 });
 
+// Bouton Jouer
 startBtn.addEventListener('click', () => {
     splashScreen.style.opacity = '0';
     setTimeout(() => {
@@ -171,22 +175,52 @@ settingsBtn.addEventListener('click', () => {
 function gameLoop() {
     if (!gameStarted) return;
 
-    // --- MOUVEMENTS ZQSD ---
-    if (keys['z'] || keys['arrowup']) tank.y -= tank.speed;
-    if (keys['s'] || keys['arrowdown']) tank.y += tank.speed;
-    if (keys['q'] || keys['arrowleft']) tank.x -= tank.speed;
-    if (keys['d'] || keys['arrowright']) tank.x += tank.speed;
+    // --- MOUVEMENTS DU TANK & ORIENTATION DU CORPS ---
+    let moving = false;
+    let targetBodyAngle = tank.bodyAngle;
 
-    // --- VISÉE SOURIS ---
+    if (keys['z'] || keys['arrowup']) { 
+        tank.y -= tank.speed; 
+        moving = true; 
+        targetBodyAngle = -Math.PI / 2; // Vers le haut
+    }
+    if (keys['s'] || keys['arrowdown']) { 
+        tank.y += tank.speed; 
+        moving = true; 
+        targetBodyAngle = Math.PI / 2;  // Vers le bas
+    }
+    if (keys['q'] || keys['arrowleft']) { 
+        tank.x -= tank.speed; 
+        moving = true; 
+        targetBodyAngle = Math.PI;      // Vers la gauche
+    }
+    if (keys['d'] || keys['arrowright']) { 
+        tank.x += tank.speed; 
+        moving = true; 
+        targetBodyAngle = 0;            // Vers la droite
+    }
+
+    // Gestion propre des diagonales
+    if ((keys['z'] || keys['arrowup']) && (keys['d'] || keys['arrowright'])) targetBodyAngle = -Math.PI / 4;
+    if ((keys['z'] || keys['arrowup']) && (keys['q'] || keys['arrowleft'])) targetBodyAngle = -3 * Math.PI / 4;
+    if ((keys['s'] || keys['arrowdown']) && (keys['d'] || keys['arrowright'])) targetBodyAngle = Math.PI / 4;
+    if ((keys['s'] || keys['arrowdown']) && (keys['q'] || keys['arrowleft'])) targetBodyAngle = 3 * Math.PI / 4;
+
+    if (moving) {
+        tank.bodyAngle = targetBodyAngle;
+    }
+
+    // --- ORIENTATION DE LA TOURELLE VERS LA SOURIS ---
     const dx = mouseX - tank.x;
     const dy = mouseY - tank.y;
-    tank.angle = Math.atan2(dy, dx);
+    tank.turretAngle = Math.atan2(dy, dx);
 
-    // --- MISE A JOUR DES PROJECTILES ---
+    // --- MISE A JOUR DES PROJECTICLES ---
     for (let i = bullets.length - 1; i >= 0; i--) {
         bullets[i].x += bullets[i].vx;
         bullets[i].y += bullets[i].vy;
 
+        // Supprimer le projectile s'il sort de l'écran
         if (bullets[i].x < 0 || bullets[i].x > canvas.width || bullets[i].y < 0 || bullets[i].y > canvas.height) {
             bullets.splice(i, 1);
         }
@@ -195,64 +229,34 @@ function gameLoop() {
     // --- RENDU GRAPHIQUE ---
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Dessiner les projectiles énergétiques
+    // Dessiner les projectiles
+    ctx.fillStyle = '#38bdf8';
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = '#38bdf8';
     for (let b of bullets) {
-        ctx.save();
-        ctx.translate(b.x, b.y);
-        ctx.rotate(b.angle);
-        
-        ctx.fillStyle = '#38bdf8';
-        ctx.shadowBlur = 12;
-        ctx.shadowColor = '#38bdf8';
-        ctx.fillRect(-12, -4, 24, 8);
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(-4, -2, 8, 4);
-        
-        ctx.restore();
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+        ctx.fill();
     }
+    ctx.shadowBlur = 0; // Réinitialiser l'effet lumineux pour la suite
 
-    // --- UTILISATION DES SPRITES DU CERCLE (8 DIRECTIONS PRÉ-DESSINÉES) ---
+    // Dessiner le Tank du joueur
+    ctx.save();
+    ctx.translate(tank.x, tank.y);
+    
+    // Rotation du corps du tank selon sa direction de mouvement
+    ctx.rotate(tank.bodyAngle);
+
     if (tankImage.complete) {
-        ctx.save();
-        ctx.translate(tank.x, tank.y);
-
-        // Convertir l'angle de la souris en degrés (0 à 360)
-        let deg = (tank.angle * 180 / Math.PI + 360) % 360;
-
-        // Découper le cercle en 8 directions (0 à 7)
-        let frameIndex = Math.floor((deg + 22.5) / 45) % 8;
-
-        const w = tankImage.width;
-        const h = tankImage.height;
-
-        // Coordonnées précises (en pourcentage de l'image source) pour extraire chaque mini-tank du cercle de droite
-        // Ordre des 8 directions de 0 à 7 (en partant du Haut et en tournant dans le sens horaire)
-        const coords = [
-            { x: 0.655, y: 0.31 }, // 0: Haut (12h)
-            { x: 0.770, y: 0.36 }, // 1: Haut-Droite (1h30)
-            { x: 0.815, y: 0.49 }, // 2: Droite (3h)
-            { x: 0.765, y: 0.62 }, // 3: Bas-Droite (4h30)
-            { x: 0.655, y: 0.67 }, // 4: Bas (6h)
-            { x: 0.545, y: 0.62 }, // 5: Bas-Gauche (7h30)
-            { x: 0.505, y: 0.49 }, // 6: Gauche (9h)
-            { x: 0.545, y: 0.36 }  // 7: Haut-Gauche (10h30)
-        ];
-
-        const target = coords[frameIndex];
-        const tankBoxSize = w * 0.12; // Taille d'un mini-tank dans l'image source
-
-        const srcX = (target.x * w) - (tankBoxSize / 2);
-        const srcY = (target.y * h) - (tankBoxSize / 2);
-
-        // Afficher le mini-tank sélectionné centré sur le joueur
+        // Affichage de l'image principale du tank centrée
         ctx.drawImage(
             tankImage, 
-            srcX, srcY, tankBoxSize, tankBoxSize, 
+            0, 0, tankImage.width / 2, tankImage.height, 
             -tank.width / 2, -tank.height / 2, tank.width, tank.height
         );
-
-        ctx.restore();
     }
+    ctx.restore();
 
+    // Boucler l'animation
     requestAnimationFrame(gameLoop);
 }
