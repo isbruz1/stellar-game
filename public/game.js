@@ -1,8 +1,8 @@
 /* ==================================================================
-   STELLAR GAME — Client V3
+   STELLAR GAME — Client V4
    ================================================================== */
 
-// ---------- Accounts (localStorage) ----------
+// ---------- Accounts ----------
 function loadAccounts() {
   try { return JSON.parse(localStorage.getItem("accounts") || "[]"); }
   catch { return []; }
@@ -10,40 +10,46 @@ function loadAccounts() {
 function saveAccounts(a) { localStorage.setItem("accounts", JSON.stringify(a)); }
 
 let accounts = loadAccounts();
-let currentAccount = null; // { pseudo, realName, skin }
+let currentAccount = null;
+let selectedAccountIdx = -1;
+let tempSkin = 0; // skin en cours de création
 
 // ---------- Runtime ----------
 let myId = null, hostId = null, currentRoomId = null;
 let lobbyPlayers = {}, gameStarted = false;
-let serverState = { players: {}, bullets: [], zones: [], mapData: null, announcement: null };
+let serverState = { players: {}, bullets: [], mapData: null };
 let myAngle = 0;
-let dead = false;
-let spectating = null;
+let dead = false, spectating = null;
 const keys = { up: false, down: false, left: false, right: false };
 let socket = null;
-let selectedAccountIdx = -1;
+let lockedAccounts = []; // pseudos verrouillés
 
 // ---------- DOM ----------
 const $ = id => document.getElementById(id);
-const splashScreen    = $("splashScreen");
-const profilesScreen  = $("profilesScreen");
-const newAccountScreen= $("newAccountScreen");
-const mainMenu        = $("mainMenuScreen");
-const serverBrowser   = $("serverBrowser");
-const lobbyScreen     = $("lobbyScreen");
-const gameScreen      = $("gameScreen");
+const splashScreen     = $("splashScreen");
+const profilesScreen   = $("profilesScreen");
+const newAccountScreen = $("newAccountScreen");
+const skinSelectScreen = $("skinSelectScreen");
+const mainMenu         = $("mainMenuScreen");
+const serverBrowser    = $("serverBrowser");
+const lobbyScreen      = $("lobbyScreen");
+const gameScreen       = $("gameScreen");
 
 const pseudoInput = $("pseudoInput");
 const realNameInput = $("realNameInput");
 const pseudoError = $("pseudoError");
-const createAccountBtn = $("createAccountBtn");
+const nextToSkinBtn = $("nextToSkinBtn");
 const backToProfilesBtn = $("backToProfilesBtn");
+const backToNameBtn = $("backToNameBtn");
 const newAccountBtn = $("newAccountBtn");
 const enterLobbyBtn = $("enterLobbyBtn");
 const accountList = $("accountList");
 const previewCanvas = $("previewCanvas");
 const previewPseudo = $("previewPseudo");
 const previewReal = $("previewReal");
+const previewSkinPicker = $("previewSkinPicker");
+const skinGrid = $("skinGrid");
+const finishAccountBtn = $("finishAccountBtn");
 
 const userPseudoEl = $("userPseudo");
 const userRealEl = $("userReal");
@@ -76,278 +82,54 @@ const canvas = $("game");
 const ctx = canvas.getContext("2d");
 const minimap = $("minimap");
 const mmCtx = minimap.getContext("2d");
+const hpBar = $("hpBar");
+const shieldBar = $("shieldBar");
 
 // ---------- Screens ----------
 function showScreen(name) {
-  [splashScreen, profilesScreen, newAccountScreen, mainMenu, serverBrowser, lobbyScreen, gameScreen]
+  [splashScreen, profilesScreen, newAccountScreen, skinSelectScreen,
+   mainMenu, serverBrowser, lobbyScreen, gameScreen]
     .forEach(s => s.classList.add("hidden"));
   const map = {
-    splash: splashScreen, profiles: profilesScreen, newAccount: newAccountScreen,
-    menu: mainMenu, browser: serverBrowser, lobby: lobbyScreen, game: gameScreen
+    splash: splashScreen, profiles: profilesScreen,
+    newAccount: newAccountScreen, skinSelect: skinSelectScreen,
+    menu: mainMenu, browser: serverBrowser,
+    lobby: lobbyScreen, game: gameScreen
   };
   if (map[name]) map[name].classList.remove("hidden");
   if (name === "game") resizeCanvas();
 }
 
 // ==================================================================
-//  SPLASH GALAXY
+//  SOCKET — connexion dès le chargement (pour recevoir locked-accounts)
 // ==================================================================
-(function initGalaxy() {
-  const c = $("galaxyCanvas");
-  const g = c.getContext("2d");
-  let running = true;
-  function resize() { c.width = window.innerWidth; c.height = window.innerHeight; }
-  resize();
-  window.addEventListener("resize", resize);
-
-  const galaxy = [];
-  for (let i = 0; i < 600; i++) {
-    const armAngle = (Math.floor(Math.random() * 2) / 2) * Math.PI * 2;
-    const dist = Math.pow(Math.random(), 0.6) * Math.min(c.width, c.height) * 0.45;
-    galaxy.push({
-      baseAngle: armAngle + dist * 0.008, dist,
-      size: Math.random() * 1.6 + 0.3,
-      speed: 0.0002 + Math.random() * 0.0004,
-      hue: Math.random() * 60 + 200, alpha: Math.random() * 0.6 + 0.3
-    });
-  }
-  const stars = [];
-  for (let i = 0; i < 200; i++) {
-    stars.push({ x: Math.random() * c.width, y: Math.random() * c.height, r: Math.random() * 1.2 + 0.2, alpha: Math.random() * 0.6 + 0.2, twinkle: Math.random() * 0.02 + 0.005 });
-  }
-  let t = 0;
-  (function loop() {
-    if (!running) return;
-    t++;
-    const bg = g.createRadialGradient(c.width/2, c.height/2, 50, c.width/2, c.height/2, Math.max(c.width, c.height));
-    bg.addColorStop(0, "#0a1530"); bg.addColorStop(0.5, "#050a1e"); bg.addColorStop(1, "#000");
-    g.fillStyle = bg; g.fillRect(0, 0, c.width, c.height);
-
-    stars.forEach(s => {
-      s.alpha += (Math.random() - 0.5) * s.twinkle;
-      s.alpha = Math.max(0.1, Math.min(0.9, s.alpha));
-      g.fillStyle = `rgba(200,220,255,${s.alpha})`;
-      g.beginPath(); g.arc(s.x, s.y, s.r, 0, Math.PI*2); g.fill();
-    });
-
-    galaxy.forEach(p => {
-      const a = p.baseAngle + t * p.speed;
-      const x = c.width/2 + Math.cos(a) * p.dist;
-      const y = c.height/2 + Math.sin(a) * p.dist * 0.55;
-      g.fillStyle = `hsla(${p.hue}, 80%, 65%, ${p.alpha})`;
-      g.beginPath(); g.arc(x, y, p.size, 0, Math.PI*2); g.fill();
-    });
-
-    const core = g.createRadialGradient(c.width/2, c.height/2, 0, c.width/2, c.height/2, 180);
-    core.addColorStop(0, "rgba(120,180,255,0.4)");
-    core.addColorStop(0.4, "rgba(80,120,220,0.15)");
-    core.addColorStop(1, "rgba(0,0,0,0)");
-    g.fillStyle = core;
-    g.beginPath(); g.arc(c.width/2, c.height/2, 180, 0, Math.PI*2); g.fill();
-
-    requestAnimationFrame(loop);
-  })();
-  window.__stopGalaxy = () => { running = false; };
-})();
-
-// ==================================================================
-//  BACKGROUND générique (profils / newAccount / menu)
-// ==================================================================
-function initStarfield(canvasId, opacity = 0.5) {
-  const c = $(canvasId);
-  if (!c) return;
-  const g = c.getContext("2d");
-  let running = true;
-  function resize() { c.width = window.innerWidth; c.height = window.innerHeight; }
-  resize();
-  window.addEventListener("resize", resize);
-
-  const stars = [];
-  for (let i = 0; i < 120; i++) {
-    stars.push({
-      x: Math.random() * c.width, y: Math.random() * c.height,
-      r: Math.random() * 1.4 + 0.3, alpha: Math.random() * 0.7 + 0.3,
-      speed: Math.random() * 0.3 + 0.05
-    });
-  }
-  (function loop() {
-    if (!running) return;
-    g.fillStyle = `rgba(3,4,13,${opacity})`;
-    g.fillRect(0, 0, c.width, c.height);
-    stars.forEach(s => {
-      s.y += s.speed;
-      if (s.y > c.height) { s.y = 0; s.x = Math.random() * c.width; }
-      g.fillStyle = `rgba(180,220,255,${s.alpha})`;
-      g.beginPath(); g.arc(s.x, s.y, s.r, 0, Math.PI*2); g.fill();
-    });
-    requestAnimationFrame(loop);
-  })();
-  return () => { running = false; };
-}
-
-// ==================================================================
-//  FLOW DÉMARRAGE
-// ==================================================================
-showScreen("splash");
-
-setTimeout(() => {
-  window.__stopGalaxy && window.__stopGalaxy();
-  showScreen("profiles");
-  initStarfield("profilesCanvas");
-  renderAccounts();
-}, 3800);
-
-// ==================================================================
-//  COMPTES
-// ==================================================================
-function renderAccounts() {
-  accountList.innerHTML = "";
-  if (accounts.length === 0) {
-    accountList.innerHTML = `<div class="no-rooms" style="grid-column:1/-1">AUCUN COMPTE<br><span class="muted">Crée-en un pour commencer</span></div>`;
-    enterLobbyBtn.disabled = true;
-    previewPseudo.textContent = "—";
-    previewReal.textContent = "—";
-    return;
-  }
-
-  accounts.forEach((acc, idx) => {
-    const card = document.createElement("div");
-    card.className = "account-card";
-    if (idx === selectedAccountIdx) card.classList.add("selected");
-
-    const c = document.createElement("canvas");
-    c.width = 80; c.height = 80;
-    drawTankPreview(c, acc.skin || 0);
-    card.appendChild(c);
-
-    const n = document.createElement("div");
-    n.className = "name";
-    n.textContent = acc.pseudo;
-    card.appendChild(n);
-
-    const r = document.createElement("div");
-    r.className = "real";
-    r.textContent = acc.realName || "";
-    card.appendChild(r);
-
-    const del = document.createElement("button");
-    del.className = "delete-btn";
-    del.textContent = "✕";
-    del.title = "Supprimer ce compte";
-    del.addEventListener("click", e => {
-      e.stopPropagation();
-      if (confirm(`⚠️ Supprimer DÉFINITIVEMENT le compte "${acc.pseudo}" ?\n\nCette action est irréversible.`)) {
-        if (confirm(`Dernière confirmation : supprimer "${acc.pseudo}" et le retirer du serveur ?`)) {
-          accounts.splice(idx, 1);
-          saveAccounts(accounts);
-          if (currentAccount && currentAccount.pseudo === acc.pseudo) currentAccount = null;
-          if (selectedAccountIdx >= accounts.length) selectedAccountIdx = accounts.length - 1;
-          if (socket) socket.emit("delete-account", acc.pseudo);
-          renderAccounts();
-          showDeleteBanner(acc.pseudo);
-        }
-      }
-    });
-    card.appendChild(del);
-
-    card.addEventListener("click", () => {
-      selectedAccountIdx = idx;
-      renderAccounts();
-      previewAccount(acc);
-    });
-
-    accountList.appendChild(card);
-  });
-
-  if (selectedAccountIdx >= 0 && accounts[selectedAccountIdx]) {
-    previewAccount(accounts[selectedAccountIdx]);
-  } else {
-    selectedAccountIdx = 0;
-    previewAccount(accounts[0]);
-  }
-}
-
-function previewAccount(acc) {
-  previewPseudo.textContent = acc.pseudo;
-  previewReal.textContent = acc.realName || "";
-  const c = previewCanvas;
-  const cx = c.getContext("2d");
-  cx.clearRect(0, 0, c.width, c.height);
-  cx.save();
-  cx.translate(c.width / 2, c.height / 2);
-  drawTankShape(cx, acc.skin || 0, -Math.PI / 2, 2.2);
-  cx.restore();
-  enterLobbyBtn.disabled = false;
-}
-
-function showDeleteBanner(pseudo) {
-  const banner = document.createElement("div");
-  banner.className = "delete-banner";
-  banner.textContent = `⚠️ COMPTE "${pseudo}" SUPPRIMÉ DÉFINITIVEMENT DU SERVEUR ⚠️`;
-  document.body.insertBefore(banner, document.body.firstChild);
-  setTimeout(() => banner.remove(), 5000);
-}
-
-enterLobbyBtn.addEventListener("click", () => {
-  if (selectedAccountIdx < 0 || !accounts[selectedAccountIdx]) return;
-  currentAccount = { ...accounts[selectedAccountIdx] };
-  userPseudoEl.textContent = currentAccount.pseudo;
-  userRealEl.textContent = currentAccount.realName;
-  startConnection();
-  showScreen("menu");
-  initStarfield("menuCanvas");
-});
-
-newAccountBtn.addEventListener("click", () => {
-  pseudoInput.value = "";
-  realNameInput.value = "";
-  pseudoError.textContent = "";
-  createAccountBtn.disabled = true;
-  showScreen("newAccount");
-  initStarfield("newAccountCanvas");
-  pseudoInput.focus();
-});
-
-backToProfilesBtn.addEventListener("click", () => showScreen("profiles"));
-
-// Validation nouveau compte
-function validateNewAccount() {
-  const p = pseudoInput.value.trim();
-  const r = realNameInput.value.trim();
-  if (p.length === 0) pseudoError.textContent = "";
-  else if (p.length < 5) pseudoError.textContent = "Minimum 5 caractères.";
-  else if (p.length > 16) pseudoError.textContent = "Maximum 16 caractères.";
-  else if (accounts.some(a => a.pseudo.toLowerCase() === p.toLowerCase()))
-    pseudoError.textContent = "Ce pseudo existe déjà.";
-  else pseudoError.textContent = "";
-  createAccountBtn.disabled = !(p.length >= 5 && p.length <= 16 &&
-    r.length > 0 && !accounts.some(a => a.pseudo.toLowerCase() === p.toLowerCase()));
-}
-pseudoInput.addEventListener("input", validateNewAccount);
-realNameInput.addEventListener("input", validateNewAccount);
-
-createAccountBtn.addEventListener("click", () => {
-  const p = pseudoInput.value.trim();
-  const r = realNameInput.value.trim();
-  if (p.length < 5 || r.length === 0) return;
-  const acc = { pseudo: p, realName: r, skin: 0 };
-  accounts.push(acc);
-  saveAccounts(accounts);
-  selectedAccountIdx = accounts.length - 1;
-  showScreen("profiles");
-  renderAccounts();
-});
-
-// ==================================================================
-//  SOCKET
-// ==================================================================
-function startConnection() {
+function connectSocket() {
   if (socket) return;
   socket = io();
 
   socket.on("connect", () => {
     myId = socket.id;
     socket.emit("list-rooms");
+  });
+
+  socket.on("locked-accounts", list => {
+    lockedAccounts = list || [];
+    if (!profilesScreen.classList.contains("hidden")) {
+      renderAccounts();
+    }
+  });
+
+  socket.on("claim-result", res => {
+    if (res.ok) {
+      // Connecté OK avec ce compte
+      enterMenuWithAccount();
+    } else {
+      alert("❌ " + res.reason);
+      // On retourne à l'écran profils
+      releaseAccount();
+      showScreen("profiles");
+      renderAccounts();
+    }
   });
 
   socket.on("room-list-update", list => {
@@ -383,10 +165,6 @@ function startConnection() {
     socket.emit("list-rooms");
   });
 
-  socket.on("account-deleted", () => {
-    if (socket) { socket.disconnect(); socket = null; }
-  });
-
   socket.on("lobby-update", data => {
     lobbyPlayers = data.players;
     hostId = data.hostId;
@@ -405,25 +183,38 @@ function startConnection() {
     showScreen("game");
     $("deathScreen").classList.add("hidden");
     $("spectatePanel").classList.add("hidden");
+    $("victoryScreen").classList.add("hidden");
     keys.up = keys.down = keys.left = keys.right = false;
   });
 
   socket.on("game-ended", () => {
     gameStarted = false;
-    showScreen("lobby");
+  });
+
+  socket.on("victory", data => {
+    gameStarted = false;
+    $("deathScreen").classList.add("hidden");
+    $("spectatePanel").classList.add("hidden");
+    if (data.winnerId === myId) {
+      $("victoryScreen").classList.remove("hidden");
+    }
   });
 
   socket.on("state", s => {
-    const wasAlive = serverState.players[myId]?.alive;
     serverState = s;
+    const me = s.players[myId];
+    if (!me) return;
+
+    // Barres HP/shield
+    hpBar.style.width = (me.hp / 100 * 100) + "%";
+    shieldBar.style.width = (me.shield / 100 * 100) + "%";
 
     // Détection mort
-    const me = s.players[myId];
-    if (me && !me.alive && !dead && gameStarted) {
+    if (!me.alive && !dead && gameStarted) {
       dead = true;
       $("deathScreen").classList.remove("hidden");
     }
-    if (me && me.alive && dead) {
+    if (me.alive && dead) {
       dead = false;
       $("deathScreen").classList.add("hidden");
       $("spectatePanel").classList.add("hidden");
@@ -432,18 +223,339 @@ function startConnection() {
   });
 }
 
+connectSocket();
+
 // ==================================================================
-//  MAIN MENU
+//  BACKGROUND étoiles
+// ==================================================================
+function initStarfield(canvasId, opacity = 0.5) {
+  const c = $(canvasId);
+  if (!c) return;
+  const g = c.getContext("2d");
+  let running = true;
+  function resize() { c.width = window.innerWidth; c.height = window.innerHeight; }
+  resize();
+  window.addEventListener("resize", resize);
+  const stars = [];
+  for (let i = 0; i < 120; i++) {
+    stars.push({
+      x: Math.random() * c.width, y: Math.random() * c.height,
+      r: Math.random() * 1.4 + 0.3, alpha: Math.random() * 0.7 + 0.3,
+      speed: Math.random() * 0.3 + 0.05
+    });
+  }
+  (function loop() {
+    if (!running) return;
+    g.fillStyle = `rgba(3,4,13,${opacity})`;
+    g.fillRect(0, 0, c.width, c.height);
+    stars.forEach(s => {
+      s.y += s.speed;
+      if (s.y > c.height) { s.y = 0; s.x = Math.random() * c.width; }
+      g.fillStyle = `rgba(180,220,255,${s.alpha})`;
+      g.beginPath(); g.arc(s.x, s.y, s.r, 0, Math.PI*2); g.fill();
+    });
+    requestAnimationFrame(loop);
+  })();
+}
+
+// ==================================================================
+//  SPLASH GALAXY — visible par TOUT LE MONDE
+// ==================================================================
+(function initGalaxy() {
+  const c = $("galaxyCanvas");
+  const g = c.getContext("2d");
+  let running = true;
+  function resize() { c.width = window.innerWidth; c.height = window.innerHeight; }
+  resize();
+  window.addEventListener("resize", resize);
+
+  const galaxy = [];
+  for (let i = 0; i < 600; i++) {
+    const armAngle = (Math.floor(Math.random() * 2) / 2) * Math.PI * 2;
+    const dist = Math.pow(Math.random(), 0.6) * Math.min(c.width, c.height) * 0.45;
+    galaxy.push({
+      baseAngle: armAngle + dist * 0.008, dist,
+      size: Math.random() * 1.6 + 0.3,
+      speed: 0.0002 + Math.random() * 0.0004,
+      hue: Math.random() * 60 + 200, alpha: Math.random() * 0.6 + 0.3
+    });
+  }
+  const stars = [];
+  for (let i = 0; i < 200; i++) {
+    stars.push({ x: Math.random() * c.width, y: Math.random() * c.height, r: Math.random() * 1.2 + 0.2, alpha: Math.random() * 0.6 + 0.2, twinkle: Math.random() * 0.02 + 0.005 });
+  }
+  let t = 0;
+  (function loop() {
+    if (!running) return;
+    t++;
+    const bg = g.createRadialGradient(c.width/2, c.height/2, 50, c.width/2, c.height/2, Math.max(c.width, c.height));
+    bg.addColorStop(0, "#0a1530"); bg.addColorStop(0.5, "#050a1e"); bg.addColorStop(1, "#000");
+    g.fillStyle = bg; g.fillRect(0, 0, c.width, c.height);
+    stars.forEach(s => {
+      s.alpha += (Math.random() - 0.5) * s.twinkle;
+      s.alpha = Math.max(0.1, Math.min(0.9, s.alpha));
+      g.fillStyle = `rgba(200,220,255,${s.alpha})`;
+      g.beginPath(); g.arc(s.x, s.y, s.r, 0, Math.PI*2); g.fill();
+    });
+    galaxy.forEach(p => {
+      const a = p.baseAngle + t * p.speed;
+      const x = c.width/2 + Math.cos(a) * p.dist;
+      const y = c.height/2 + Math.sin(a) * p.dist * 0.55;
+      g.fillStyle = `hsla(${p.hue}, 80%, 65%, ${p.alpha})`;
+      g.beginPath(); g.arc(x, y, p.size, 0, Math.PI*2); g.fill();
+    });
+    const core = g.createRadialGradient(c.width/2, c.height/2, 0, c.width/2, c.height/2, 180);
+    core.addColorStop(0, "rgba(120,180,255,0.4)");
+    core.addColorStop(0.4, "rgba(80,120,220,0.15)");
+    core.addColorStop(1, "rgba(0,0,0,0)");
+    g.fillStyle = core;
+    g.beginPath(); g.arc(c.width/2, c.height/2, 180, 0, Math.PI*2); g.fill();
+    requestAnimationFrame(loop);
+  })();
+  window.__stopGalaxy = () => { running = false; };
+})();
+
+// ==================================================================
+//  FLOW DÉMARRAGE
+// ==================================================================
+showScreen("splash");
+setTimeout(() => {
+  window.__stopGalaxy && window.__stopGalaxy();
+  showScreen("profiles");
+  initStarfield("profilesCanvas");
+  renderAccounts();
+}, 3500);
+
+// ==================================================================
+//  COMPTES
+// ==================================================================
+function isAccountLocked(pseudo) {
+  return lockedAccounts.some(p => p.toLowerCase() === pseudo.toLowerCase());
+}
+
+function renderAccounts() {
+  accountList.innerHTML = "";
+  if (accounts.length === 0) {
+    accountList.innerHTML = `<div class="no-rooms" style="grid-column:1/-1">AUCUN COMPTE<br><span class="muted">Crée-en un pour commencer</span></div>`;
+    enterLobbyBtn.disabled = true;
+    previewPseudo.textContent = "—";
+    previewReal.textContent = "—";
+    previewSkinPicker.innerHTML = "";
+    return;
+  }
+
+  accounts.forEach((acc, idx) => {
+    const card = document.createElement("div");
+    card.className = "account-card";
+    const locked = isAccountLocked(acc.pseudo);
+
+    if (idx === selectedAccountIdx) card.classList.add("selected");
+    if (locked) card.classList.add("locked");
+
+    const c = document.createElement("canvas");
+    c.width = 80; c.height = 80;
+    drawTankPreview(c, acc.skin || 0);
+    card.appendChild(c);
+
+    const n = document.createElement("div");
+    n.className = "name";
+    n.textContent = acc.pseudo;
+    card.appendChild(n);
+
+    const r = document.createElement("div");
+    r.className = "real";
+    r.textContent = acc.realName || "";
+    card.appendChild(r);
+
+    // Bouton supprimer
+    const del = document.createElement("button");
+    del.className = "delete-btn";
+    del.textContent = "✕";
+    del.title = "Supprimer ce compte";
+    del.addEventListener("click", e => {
+      e.stopPropagation();
+      if (locked) return alert("❌ Impossible de supprimer un compte en cours d'utilisation.");
+      if (confirm(`⚠️ Supprimer définitivement "${acc.pseudo}" ?`)) {
+        accounts.splice(idx, 1);
+        saveAccounts(accounts);
+        if (selectedAccountIdx >= accounts.length) selectedAccountIdx = accounts.length - 1;
+        renderAccounts();
+      }
+    });
+    card.appendChild(del);
+
+    // Clic sur la carte
+    card.addEventListener("click", () => {
+      if (locked) return;
+      selectedAccountIdx = idx;
+      renderAccounts();
+      previewAccount(accounts[idx]);
+    });
+
+    accountList.appendChild(card);
+  });
+
+  // Sélectionne le premier compte non-locked par défaut
+  if (selectedAccountIdx < 0 || selectedAccountIdx >= accounts.length ||
+      isAccountLocked(accounts[selectedAccountIdx]?.pseudo || "")) {
+    const firstOk = accounts.findIndex(a => !isAccountLocked(a.pseudo));
+    selectedAccountIdx = firstOk;
+  }
+
+  if (selectedAccountIdx >= 0 && accounts[selectedAccountIdx]) {
+    previewAccount(accounts[selectedAccountIdx]);
+  } else {
+    enterLobbyBtn.disabled = true;
+    previewPseudo.textContent = "—";
+    previewReal.textContent = "—";
+    previewSkinPicker.innerHTML = "";
+  }
+}
+
+function previewAccount(acc) {
+  previewPseudo.textContent = acc.pseudo;
+  previewReal.textContent = acc.realName || "";
+  drawPreviewTank(acc.skin || 0);
+
+  // Skin picker inline
+  previewSkinPicker.innerHTML = "";
+  SKINS.forEach((s, i) => {
+    const c = document.createElement("canvas");
+    c.width = 60; c.height = 60;
+    if (i === (acc.skin || 0)) c.className = "selected";
+    drawTankPreview(c, i);
+    c.addEventListener("click", () => {
+      acc.skin = i;
+      const realIdx = accounts.findIndex(a => a.pseudo === acc.pseudo);
+      if (realIdx >= 0) accounts[realIdx].skin = i;
+      saveAccounts(accounts);
+      previewAccount(acc);
+    });
+    previewSkinPicker.appendChild(c);
+  });
+
+  const locked = isAccountLocked(acc.pseudo);
+  enterLobbyBtn.disabled = locked;
+  enterLobbyBtn.textContent = locked ? "🔒 EN UTILISATION" : "JOUER";
+}
+
+function drawPreviewTank(skinId) {
+  const c = previewCanvas;
+  const cx = c.getContext("2d");
+  cx.clearRect(0, 0, c.width, c.height);
+  cx.save();
+  cx.translate(c.width / 2, c.height / 2);
+  drawTankShape(cx, skinId, -Math.PI / 2, 2.0);
+  cx.restore();
+}
+
+// ==================================================================
+//  ENTRER DANS LE MENU
+// ==================================================================
+function enterMenuWithAccount() {
+  userPseudoEl.textContent = currentAccount.pseudo;
+  userRealEl.textContent = currentAccount.realName;
+  showScreen("menu");
+  initStarfield("menuCanvas");
+}
+
+enterLobbyBtn.addEventListener("click", () => {
+  if (selectedAccountIdx < 0 || !accounts[selectedAccountIdx]) return;
+  const acc = accounts[selectedAccountIdx];
+  if (isAccountLocked(acc.pseudo)) return alert("❌ Ce compte est déjà utilisé dans un autre onglet.");
+  currentAccount = { ...acc };
+  socket.emit("claim-account", currentAccount.pseudo);
+});
+
+// ==================================================================
+//  NOUVEAU COMPTE — étape 1 : pseudo + nom
+// ==================================================================
+newAccountBtn.addEventListener("click", () => {
+  pseudoInput.value = "";
+  realNameInput.value = "";
+  pseudoError.textContent = "";
+  nextToSkinBtn.disabled = true;
+  showScreen("newAccount");
+  initStarfield("newAccountCanvas");
+  pseudoInput.focus();
+});
+
+backToProfilesBtn.addEventListener("click", () => showScreen("profiles"));
+
+function validateNewAccount() {
+  const p = pseudoInput.value.trim();
+  const r = realNameInput.value.trim();
+  if (p.length === 0) pseudoError.textContent = "";
+  else if (p.length < 5) pseudoError.textContent = "Minimum 5 caractères.";
+  else if (p.length > 16) pseudoError.textContent = "Maximum 16 caractères.";
+  else if (accounts.some(a => a.pseudo.toLowerCase() === p.toLowerCase()))
+    pseudoError.textContent = "Ce pseudo existe déjà.";
+  else if (isAccountLocked(p))
+    pseudoError.textContent = "Ce pseudo est déjà utilisé ailleurs.";
+  else pseudoError.textContent = "";
+  nextToSkinBtn.disabled = !(p.length >= 5 && p.length <= 16 && r.length > 0 &&
+    !accounts.some(a => a.pseudo.toLowerCase() === p.toLowerCase()) &&
+    !isAccountLocked(p));
+}
+pseudoInput.addEventListener("input", validateNewAccount);
+realNameInput.addEventListener("input", validateNewAccount);
+
+nextToSkinBtn.addEventListener("click", () => {
+  tempSkin = 0;
+  showScreen("skinSelect");
+  initStarfield("skinSelectCanvas");
+  buildSkinGrid();
+});
+
+// ==================================================================
+//  NOUVEAU COMPTE — étape 2 : skin
+// ==================================================================
+function buildSkinGrid() {
+  skinGrid.innerHTML = "";
+  SKINS.forEach((s, i) => {
+    const c = document.createElement("canvas");
+    c.width = 90; c.height = 90;
+    if (i === tempSkin) c.className = "selected";
+    drawTankPreview(c, i);
+    c.addEventListener("click", () => {
+      tempSkin = i;
+      buildSkinGrid();
+    });
+    skinGrid.appendChild(c);
+  });
+}
+
+backToNameBtn.addEventListener("click", () => showScreen("newAccount"));
+
+finishAccountBtn.addEventListener("click", () => {
+  const p = pseudoInput.value.trim();
+  const r = realNameInput.value.trim();
+  if (p.length < 5 || r.length === 0) return;
+  const acc = { pseudo: p, realName: r, skin: tempSkin };
+  accounts.push(acc);
+  saveAccounts(accounts);
+  selectedAccountIdx = accounts.length - 1;
+  showScreen("profiles");
+  renderAccounts();
+});
+
+// ==================================================================
+//  MENU
 // ==================================================================
 playBtn.addEventListener("click", () => {
   showScreen("browser");
   if (socket) socket.emit("list-rooms");
 });
 
+function releaseAccount() {
+  if (!currentAccount || !socket) return;
+  socket.emit("release-account", currentAccount.pseudo);
+  currentAccount = null;
+}
+
 disconnectBtn.addEventListener("click", () => {
   if (!confirm("Se déconnecter ?")) return;
-  if (socket) { socket.disconnect(); socket = null; }
-  currentAccount = null;
+  releaseAccount();
   selectedAccountIdx = -1;
   showScreen("profiles");
   renderAccounts();
@@ -612,6 +724,8 @@ $("backToLobbyBtn").addEventListener("click", () => {
   dead = false;
   spectating = null;
   gameStarted = false;
+  $("deathScreen").classList.add("hidden");
+  $("spectatePanel").classList.add("hidden");
   showScreen("lobby");
 });
 
@@ -635,7 +749,7 @@ function renderSpectateList() {
     if (!p.alive || p.id === myId) return;
     const el = document.createElement("div");
     el.className = "spectate-item" + (spectating === p.id ? " active" : "");
-    el.textContent = `${p.pseudo} (${Math.round(p.hp)} HP) — 👁 ${p.spectators || 0}`;
+    el.textContent = `${p.pseudo}`;
     el.addEventListener("click", () => {
       if (socket) socket.emit("spectate", p.id);
       spectating = p.id;
@@ -646,60 +760,17 @@ function renderSpectateList() {
 }
 
 // ==================================================================
-//  PARAMÈTRES
+//  VICTORY SCREEN
 // ==================================================================
-function openSettings() {
-  settingsPseudo.value = currentAccount?.pseudo || "";
-  settingsRealName.value = currentAccount?.realName || "";
-  settingsModal.classList.remove("hidden");
-  buildSkinPicker();
-}
-$("settingsBtn")?.addEventListener("click", openSettings);
-closeSettings.addEventListener("click", () => settingsModal.classList.add("hidden"));
-
-settingsPseudo.addEventListener("change", () => {
-  const v = (settingsPseudo.value || "").trim();
-  if (v.length < 5 || v.length > 16) { settingsPseudo.value = currentAccount.pseudo; return; }
-  currentAccount.pseudo = v;
-  userPseudoEl.textContent = v;
-  updateAccountInStorage();
-  if (socket) socket.emit("update-pseudo", v);
+$("returnToServerBtn").addEventListener("click", () => {
+  $("victoryScreen").classList.add("hidden");
+  $("deathScreen").classList.add("hidden");
+  $("spectatePanel").classList.add("hidden");
+  gameStarted = false;
+  dead = false;
+  spectating = null;
+  showScreen("lobby");
 });
-
-settingsRealName.addEventListener("change", () => {
-  const v = (settingsRealName.value || "").trim().slice(0, 32);
-  currentAccount.realName = v;
-  userRealEl.textContent = v;
-  updateAccountInStorage();
-  if (socket) socket.emit("update-realname", v);
-});
-
-function updateAccountInStorage() {
-  const i = accounts.findIndex(a => a.pseudo === currentAccount.pseudo);
-  // On récupère par pseudo d'origine - plus simple : on remplace l'entrée sélectionnée
-  if (selectedAccountIdx >= 0 && accounts[selectedAccountIdx]) {
-    accounts[selectedAccountIdx] = { ...currentAccount };
-    saveAccounts(accounts);
-  }
-}
-
-function buildSkinPicker() {
-  skinPicker.innerHTML = "";
-  SKINS.forEach((s, i) => {
-    const c = document.createElement("canvas");
-    c.width = 70; c.height = 70;
-    c.className = "skin-option" + (i === (currentAccount?.skin || 0) ? " selected" : "");
-    c.title = s.name;
-    drawTankPreview(c, i);
-    c.addEventListener("click", () => {
-      currentAccount.skin = i;
-      updateAccountInStorage();
-      if (socket) socket.emit("update-skin", i);
-      buildSkinPicker();
-    });
-    skinPicker.appendChild(c);
-  });
-}
 
 // ==================================================================
 //  CLAVIER
@@ -763,7 +834,6 @@ window.addEventListener("resize", resizeCanvas);
 resizeCanvas();
 
 function getCamera() {
-  // En mode spectateur, suivre la cible
   const target = spectating ? serverState.players[spectating] : serverState.players[myId];
   if (!target) return { x: 0, y: 0 };
   return { x: target.x - canvas.width / 2, y: target.y - canvas.height / 2 };
@@ -772,57 +842,61 @@ function getCamera() {
 // ==================================================================
 //  RENDU
 // ==================================================================
-const BIOME_COLORS = {
-  grass:  { bg: "#1d3a1a", accent: "#2d5a28", tree: "#0f2410" },
-  desert: { bg: "#5a4a2a", accent: "#7a6038", tree: "#3a2a1a" },
-  snow:   { bg: "#2a3a4a", accent: "#4a5a6a", tree: "#1a2a3a" },
-  water:  { bg: "#0a2040", accent: "#1a3560", tree: "#000000" }
-};
-
 function drawBiomes() {
-  const md = serverState.mapData;
-  if (!md) return;
-  const cam = getCamera();
-
-  // Fond par défaut
   ctx.fillStyle = "#0f1a10";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  // Biomes
-  md.biomes.forEach(b => {
-    const colors = BIOME_COLORS[b.type] || BIOME_COLORS.grass;
-    const x = b.x - cam.x, y = b.y - cam.y;
-    const grad = ctx.createRadialGradient(x, y, 0, x, y, b.r);
-    grad.addColorStop(0, colors.accent);
-    grad.addColorStop(1, "rgba(0,0,0,0)");
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(x, y, b.r, 0, Math.PI * 2);
-    ctx.fill();
-  });
 }
 
 function drawRivers() {
   const md = serverState.mapData;
   if (!md) return;
   const cam = getCamera();
-  md.rivers.forEach(r => {
-    ctx.strokeStyle = "rgba(30, 80, 150, 0.8)";
-    ctx.lineWidth = r.width;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
+  const time = Date.now() / 1000;
+
+  md.rivers.forEach((r, rIdx) => {
+    // Berges
+    ctx.strokeStyle = "rgba(40, 30, 15, 0.8)";
+    ctx.lineWidth = r.width + 24;
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
     ctx.beginPath();
     r.points.forEach((p, i) => {
       const x = p.x - cam.x, y = p.y - cam.y;
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
     });
     ctx.stroke();
 
-    // Reflet
-    ctx.strokeStyle = "rgba(100, 180, 255, 0.3)";
-    ctx.lineWidth = r.width * 0.4;
+    // Herbe/sable
+    ctx.strokeStyle = "rgba(70, 90, 40, 0.5)";
+    ctx.lineWidth = r.width + 12;
     ctx.stroke();
+
+    // Eau
+    ctx.strokeStyle = "rgba(15, 45, 100, 0.95)";
+    ctx.lineWidth = r.width;
+    ctx.beginPath();
+    r.points.forEach((p, i) => {
+      const x = p.x - cam.x, y = p.y - cam.y;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    // Eau claire
+    ctx.strokeStyle = "rgba(30, 80, 150, 0.7)";
+    ctx.lineWidth = r.width * 0.7;
+    ctx.stroke();
+
+    // Reflets animés
+    ctx.strokeStyle = `rgba(120, 200, 255, ${0.4 + Math.sin(time * 1.5) * 0.15})`;
+    ctx.lineWidth = r.width * 0.45;
+    ctx.setLineDash([18, 28]);
+    ctx.lineDashOffset = -time * 40;
+    ctx.beginPath();
+    r.points.forEach((p, i) => {
+      const x = p.x - cam.x, y = p.y - cam.y;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+    ctx.setLineDash([]);
   });
 }
 
@@ -830,24 +904,42 @@ function drawForests() {
   const md = serverState.mapData;
   if (!md) return;
   const cam = getCamera();
+  const time = Date.now() / 1000;
+
   md.forests.forEach(f => {
-    f.forEach(t => {
+    f.forEach((t, idx) => {
       const x = t.x - cam.x, y = t.y - cam.y;
-      if (x < -50 || x > canvas.width + 50 || y < -50 || y > canvas.height + 50) return;
+      if (x < -80 || x > canvas.width + 80 || y < -80 || y > canvas.height + 80) return;
+
+      const sway = Math.sin(time * 1.2 + idx * 0.7) * 2.5;
+
       // Ombre
-      ctx.fillStyle = "rgba(0,0,0,0.4)";
+      ctx.fillStyle = "rgba(0,0,0,0.45)";
       ctx.beginPath();
-      ctx.arc(x + 4, y + 6, t.r, 0, Math.PI * 2);
+      ctx.ellipse(x + 6, y + t.r * 0.6, t.r * 0.95, t.r * 0.4, 0, 0, Math.PI * 2);
       ctx.fill();
-      // Arbre
-      ctx.fillStyle = "#0f2410";
+
+      // Tronc
+      ctx.fillStyle = "#2a1808";
+      ctx.fillRect(x - 5, y + t.r * 0.1, 10, t.r * 0.7);
+      ctx.fillStyle = "#5a3a1a";
+      ctx.fillRect(x - 5, y + t.r * 0.1, 4, t.r * 0.7);
+
+      // Feuillages
+      ctx.fillStyle = "#0a1f0a";
       ctx.beginPath();
-      ctx.arc(x, y, t.r, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.arc(x + sway * 0.3, y + t.r * 0.1, t.r, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#1a3a1a";
+      ctx.beginPath();
+      ctx.arc(x - 2 + sway * 0.5, y - t.r * 0.15, t.r * 0.85, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = "#2d5a28";
       ctx.beginPath();
-      ctx.arc(x - 3, y - 3, t.r * 0.75, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.arc(x - 4 + sway * 0.7, y - t.r * 0.35, t.r * 0.6, 0, Math.PI * 2); ctx.fill();
+
+      // Highlight
+      ctx.fillStyle = "rgba(150, 220, 150, 0.4)";
+      ctx.beginPath();
+      ctx.arc(x - 7 + sway * 0.8, y - t.r * 0.5, t.r * 0.28, 0, Math.PI * 2); ctx.fill();
     });
   });
 }
@@ -859,18 +951,13 @@ function drawWalls() {
   md.walls.forEach(w => {
     const x = w.x - cam.x, y = w.y - cam.y;
     if (x + w.w < 0 || x > canvas.width || y + w.h < 0 || y > canvas.height) return;
-
-    // Ombre
     ctx.fillStyle = "rgba(0,0,0,0.5)";
     ctx.fillRect(x + 4, y + 6, w.w, w.h);
-    // Corps
     ctx.fillStyle = "#3a3a4a";
     ctx.fillRect(x, y, w.w, w.h);
-    // Bordure
     ctx.strokeStyle = "#5a5a7a";
     ctx.lineWidth = 3;
     ctx.strokeRect(x, y, w.w, w.h);
-    // Reflet
     ctx.fillStyle = "rgba(255,255,255,0.06)";
     ctx.fillRect(x, y, w.w, 6);
   });
@@ -900,59 +987,6 @@ function drawGrid() {
   ctx.strokeRect(-cam.x, -cam.y, 3200, 3200);
 }
 
-const ZONE_COLORS = {
-  heal:   { main: "#4f4",  glow: "rgba(68,255,68,0.4)"  },
-  speed:  { main: "#4af",  glow: "rgba(68,170,255,0.4)" },
-  damage: { main: "#f55",  glow: "rgba(255,85,85,0.4)"  },
-  shield: { main: "#fd4",  glow: "rgba(255,221,68,0.4)" }
-};
-
-function drawZones() {
-  const cam = getCamera();
-  const time = Date.now() / 1000;
-  serverState.zones.forEach(z => {
-    const info = ZONE_COLORS[z.type] || ZONE_COLORS.heal;
-    const x = z.x - cam.x, y = z.y - cam.y;
-    const pulse = 1 + Math.sin(time * 2 + z.x * 0.01) * 0.05;
-    const r = z.radius * pulse;
-
-    const grad = ctx.createRadialGradient(x, y, r * 0.3, x, y, r);
-    grad.addColorStop(0, info.glow);
-    grad.addColorStop(1, "rgba(0,0,0,0)");
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.strokeStyle = info.main;
-    ctx.lineWidth = 3;
-    ctx.setLineDash([10, 8]);
-    ctx.lineDashOffset = -time * 40;
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // Si mobile, flèche directionnelle
-    if (z.moving) {
-      const arrowLen = 40;
-      const a = Math.atan2(z.vy, z.vx);
-      ctx.strokeStyle = info.main;
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      ctx.lineTo(x + Math.cos(a) * arrowLen, y + Math.sin(a) * arrowLen);
-      ctx.stroke();
-    }
-
-    ctx.fillStyle = info.main;
-    ctx.font = "bold 13px Segoe UI, Arial";
-    ctx.textAlign = "center";
-    const labels = { heal: "❤ SOIN", speed: "⚡ VITESSE", damage: "💥 DÉGÂTS", shield: "🛡 BOUCLIER" };
-    ctx.fillText(labels[z.type] || z.type.toUpperCase(), x, y - r - 8);
-  });
-}
-
 function drawPlayer(p, isMe) {
   const cam = getCamera();
   const x = p.x - cam.x, y = p.y - cam.y;
@@ -962,21 +996,13 @@ function drawPlayer(p, isMe) {
   ctx.ellipse(x, y + 6, 32, 12, 0, 0, Math.PI * 2);
   ctx.fill();
 
+  // Bouclier visuel discret
   if (p.shield > 0) {
-    ctx.strokeStyle = "rgba(255,221,68,0.8)";
+    ctx.strokeStyle = `rgba(255,221,68,${0.3 + (p.shield / 100) * 0.5})`;
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.arc(x, y, 40, 0, Math.PI * 2);
     ctx.stroke();
-  }
-  if (p.speedBoost > 0) {
-    ctx.strokeStyle = "rgba(68,170,255,0.6)";
-    ctx.lineWidth = 2;
-    ctx.setLineDash([5, 5]);
-    ctx.beginPath();
-    ctx.arc(x, y, 36, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.setLineDash([]);
   }
 
   ctx.save();
@@ -984,23 +1010,11 @@ function drawPlayer(p, isMe) {
   drawTankShape(ctx, p.skin, p.angle);
   ctx.restore();
 
+  // Pseudo (pas de HP affiché)
   ctx.fillStyle = isMe ? "#4af" : "#fff";
   ctx.font = "bold 13px Segoe UI, Arial";
   ctx.textAlign = "center";
   ctx.fillText(p.pseudo, x, y - 50);
-
-  // Œil + compteur spectateurs
-  if (p.spectators > 0) {
-    ctx.fillStyle = "#fd4";
-    ctx.font = "bold 12px Segoe UI, Arial";
-    ctx.fillText(`👁 ${p.spectators}`, x, y - 66);
-  }
-
-  const bw = 52, bh = 5;
-  ctx.fillStyle = "rgba(0,0,0,0.6)";
-  ctx.fillRect(x - bw / 2, y - 30, bw, bh);
-  ctx.fillStyle = p.hp > 60 ? "#4f4" : p.hp > 30 ? "#fd4" : "#f55";
-  ctx.fillRect(x - bw / 2, y - 30, bw * (p.hp / 100), bh);
 }
 
 function drawBullets() {
@@ -1018,79 +1032,50 @@ function drawBullets() {
 
 function drawScoreboard() {
   const el = $("scoreboard");
-  const list = Object.values(serverState.players).sort((a, b) => b.hp - a.hp);
+  const list = Object.values(serverState.players);
   el.innerHTML = list.map(p => {
     const c = p.alive ? (p.id === myId ? "#4af" : "#ddd") : "#f55";
-    const spec = p.spectators > 0 ? ` <span style="color:#fd4">👁${p.spectators}</span>` : "";
-    return `<div style="color:${c}">${p.pseudo} — ${p.alive ? Math.round(p.hp) + " HP" : "💀"}${spec}</div>`;
+    return `<div style="color:${c}">${p.pseudo}${p.id === myId ? " (toi)" : ""}</div>`;
   }).join("");
-}
-
-function drawZoneIndicator() {
-  const el = $("zoneIndicator");
-  const me = serverState.players[myId];
-  if (!me) { el.innerHTML = ""; return; }
-  const chips = [];
-  if (me.shield > 0) chips.push(`<div class="zone-chip" style="color:#fd4;border-color:#fd4">🛡 BOUCLIER ${Math.ceil(me.shield / 60)}s</div>`);
-  if (me.speedBoost > 0) chips.push(`<div class="zone-chip" style="color:#4af;border-color:#4af">⚡ VITESSE</div>`);
-  if (me.damageBoost > 0) chips.push(`<div class="zone-chip" style="color:#f55;border-color:#f55">💥 DÉGÂTS +</div>`);
-  el.innerHTML = chips.join("");
-}
-
-function drawAnnouncement() {
-  const el = $("announcement");
-  if (serverState.announcement) {
-    el.textContent = serverState.announcement;
-    el.classList.remove("hidden");
-  } else {
-    el.classList.add("hidden");
-  }
 }
 
 function drawMinimap() {
   const size = minimap.width;
   const scale = size / 3200;
   mmCtx.clearRect(0, 0, size, size);
-  mmCtx.fillStyle = "rgba(10, 20, 40, 0.85)";
+  mmCtx.fillStyle = "rgba(10, 20, 40, 0.9)";
   mmCtx.fillRect(0, 0, size, size);
 
-  // Murs
+  // Murs (fond de carte)
   if (serverState.mapData) {
-    mmCtx.fillStyle = "rgba(150, 150, 180, 0.5)";
+    mmCtx.fillStyle = "rgba(150, 150, 180, 0.4)";
     serverState.mapData.walls.forEach(w => {
       mmCtx.fillRect(w.x * scale, w.y * scale, w.w * scale, w.h * scale);
     });
-    // Rivières
     mmCtx.strokeStyle = "rgba(80, 140, 220, 0.6)";
     mmCtx.lineWidth = 2;
     serverState.mapData.rivers.forEach(r => {
       mmCtx.beginPath();
       r.points.forEach((p, i) => {
-        if (i === 0) mmCtx.moveTo(p.x * scale, p.y * scale);
-        else mmCtx.lineTo(p.x * scale, p.y * scale);
+        i === 0 ? mmCtx.moveTo(p.x * scale, p.y * scale) : mmCtx.lineTo(p.x * scale, p.y * scale);
       });
       mmCtx.stroke();
     });
   }
 
-  // Zones
-  serverState.zones.forEach(z => {
-    const info = ZONE_COLORS[z.type] || ZONE_COLORS.heal;
-    mmCtx.strokeStyle = info.main;
+  // UNIQUEMENT moi
+  const me = serverState.players[myId];
+  if (me && me.alive) {
+    mmCtx.fillStyle = "#4af";
+    mmCtx.beginPath();
+    mmCtx.arc(me.x * scale, me.y * scale, 4, 0, Math.PI * 2);
+    mmCtx.fill();
+    mmCtx.strokeStyle = "rgba(68,170,255,0.6)";
     mmCtx.lineWidth = 2;
     mmCtx.beginPath();
-    mmCtx.arc(z.x * scale, z.y * scale, z.radius * scale, 0, Math.PI * 2);
+    mmCtx.arc(me.x * scale, me.y * scale, 7, 0, Math.PI * 2);
     mmCtx.stroke();
-  });
-
-  // Joueurs
-  Object.values(serverState.players).forEach(p => {
-    if (!p.alive) return;
-    mmCtx.fillStyle = p.id === myId ? "#4af" : (spectating === p.id ? "#fd4" : "#fff");
-    mmCtx.beginPath();
-    mmCtx.arc(p.x * scale, p.y * scale, p.id === myId ? 4 : 3, 0, Math.PI * 2);
-    mmCtx.fill();
-  });
+  }
 }
 
 function loop() {
@@ -1100,15 +1085,11 @@ function loop() {
     drawGrid();
     drawWalls();
     drawForests();
-    drawZones();
-
     Object.values(serverState.players).forEach(p => {
       if (p.alive) drawPlayer(p, p.id === myId);
     });
     drawBullets();
     drawScoreboard();
-    drawZoneIndicator();
-    drawAnnouncement();
     drawMinimap();
   }
   requestAnimationFrame(loop);

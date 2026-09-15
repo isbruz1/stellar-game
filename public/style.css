@@ -32,12 +32,12 @@ html, body {
 /* ============ PROFILES ============ */
 .profiles-screen { background: radial-gradient(circle at center, #0d1a3a, #03040d); overflow: hidden; }
 #profilesCanvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-.profiles-header { position: relative; z-index: 1; text-align: center; padding: 32px 24px 16px; }
-.mini-logo { width: 80px; }
-.profiles-header h1 { font-size: 24px; letter-spacing: 8px; color: #4af; margin-top: 8px; text-shadow: 0 0 20px rgba(68,170,255,0.6); }
-.profiles-header p { margin-top: 8px; font-size: 13px; letter-spacing: 2px; }
+.profiles-header { position: relative; z-index: 1; text-align: center; padding: 24px 24px 12px; }
+.mini-logo { width: 70px; }
+.profiles-header h1 { font-size: 22px; letter-spacing: 8px; color: #4af; margin-top: 6px; text-shadow: 0 0 20px rgba(68,170,255,0.6); }
+.profiles-header p { margin-top: 6px; font-size: 12px; letter-spacing: 2px; }
 
-.profiles-content { position: relative; z-index: 1; flex: 1; display: flex; gap: 24px; padding: 24px 48px; overflow: hidden; }
+.profiles-content { position: relative; z-index: 1; flex: 1; display: flex; gap: 24px; padding: 16px 40px 24px; overflow: hidden; }
 .account-list { flex: 1; display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; align-content: start; overflow-y: auto; padding-right: 8px; }
 
 .account-card { background: rgba(255,255,255,0.04); border: 2px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 16px 12px; text-align: center; cursor: pointer; transition: .15s; position: relative; }
@@ -50,30 +50,71 @@ html, body {
 .account-card:hover .delete-btn { opacity: 1; }
 .account-card .delete-btn:hover { background: #f55; color: #fff; }
 
-.account-right { width: 320px; display: flex; align-items: center; justify-content: center; }
-.selected-preview { background: rgba(0,0,0,0.5); border: 1px solid rgba(68,170,255,0.3); border-radius: 20px; padding: 24px; text-align: center; width: 100%; box-shadow: 0 0 40px rgba(68,170,255,0.15); }
-.selected-preview canvas { margin: 0 auto 12px; display: block; }
-.preview-pseudo { font-size: 22px; font-weight: 800; color: #4af; letter-spacing: 2px; text-shadow: 0 0 15px rgba(68,170,255,0.6); }
-.preview-real { font-size: 13px; color: #89a; font-style: italic; margin-top: 4px; margin-bottom: 20px; }
-.selected-preview .btn { min-width: auto; width: 100%; }
+/* Compte verrouillé */
+.account-card.locked {
+  opacity: 0.4;
+  cursor: not-allowed;
+  filter: grayscale(0.8);
+  border-color: rgba(255,80,80,0.3);
+}
+.account-card.locked:hover {
+  border-color: rgba(255,80,80,0.5);
+  background: rgba(255,50,50,0.05);
+}
+.account-card.locked::before {
+  content: "🔒 EN UTILISATION";
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.65);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #f55;
+  font-weight: 800;
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-align: center;
+  padding: 8px;
+}
 
-.profiles-footer { position: relative; z-index: 1; padding: 16px; display: flex; justify-content: center; border-top: 1px solid rgba(255,255,255,0.06); }
-.profiles-footer .btn { min-width: 260px; }
+.account-right { width: 340px; display: flex; align-items: center; justify-content: center; }
+.selected-preview { background: rgba(0,0,0,0.5); border: 1px solid rgba(68,170,255,0.3); border-radius: 20px; padding: 20px; text-align: center; width: 100%; box-shadow: 0 0 40px rgba(68,170,255,0.15); }
+.selected-preview canvas { margin: 0 auto 8px; display: block; }
+.preview-pseudo { font-size: 20px; font-weight: 800; color: #4af; letter-spacing: 2px; text-shadow: 0 0 15px rgba(68,170,255,0.6); }
+.preview-real { font-size: 12px; color: #89a; font-style: italic; margin-top: 2px; }
 
-/* ============ NEW ACCOUNT ============ */
+.preview-skins-label { font-size: 10px; color: #89a; letter-spacing: 3px; margin-top: 14px; margin-bottom: 6px; }
+.preview-skins { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 14px; }
+.preview-skins canvas { border-radius: 8px; padding: 2px; cursor: pointer; border: 2px solid transparent; transition: .15s; width: 100%; height: auto; }
+.preview-skins canvas:hover { background: rgba(255,255,255,0.06); }
+.preview-skins canvas.selected { border-color: #4af; box-shadow: 0 0 12px rgba(68,170,255,0.5); }
+
+.selected-preview .btn { min-width: auto; width: 100%; padding: 14px; font-size: 15px; }
+
+.profiles-footer { position: relative; z-index: 1; padding: 12px; display: flex; justify-content: center; border-top: 1px solid rgba(255,255,255,0.06); }
+.profiles-footer .btn { min-width: 260px; padding: 14px 32px; font-size: 15px; }
+
+/* ============ NEW ACCOUNT / SKIN SELECT ============ */
 .new-account-screen { align-items: center; justify-content: center; background: radial-gradient(circle at 50% 40%, #0d1a3a, #03040d); overflow: hidden; }
-#newAccountCanvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+#newAccountCanvas, #skinSelectCanvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 
-.login-box { position: relative; z-index: 1; display: flex; flex-direction: column; background: rgba(8,14,32,0.92); border: 1px solid rgba(68,170,255,0.35); border-radius: 22px; padding: 40px 48px; min-width: 420px; max-width: 92vw; box-shadow: 0 0 100px rgba(68,170,255,0.2); }
-.login-logo { width: 160px; margin: 0 auto 16px; display: block; filter: drop-shadow(0 0 25px rgba(68,170,255,0.7)); }
-.login-box h1 { font-size: 20px; letter-spacing: 6px; color: #4af; text-align: center; margin-bottom: 6px; }
-.login-sub { text-align: center; color: #89a; font-size: 12px; margin-bottom: 24px; letter-spacing: 2px; text-transform: uppercase; }
-.login-box label { font-size: 11px; color: #89a; text-transform: uppercase; letter-spacing: 2px; margin: 12px 0 6px; }
+.login-box { position: relative; z-index: 1; display: flex; flex-direction: column; background: rgba(8,14,32,0.92); border: 1px solid rgba(68,170,255,0.35); border-radius: 22px; padding: 36px 44px; min-width: 440px; max-width: 92vw; box-shadow: 0 0 100px rgba(68,170,255,0.2); }
+.login-logo { width: 140px; margin: 0 auto 12px; display: block; filter: drop-shadow(0 0 25px rgba(68,170,255,0.7)); }
+.login-box h1 { font-size: 20px; letter-spacing: 6px; color: #4af; text-align: center; margin-bottom: 4px; }
+.login-sub { text-align: center; color: #89a; font-size: 11px; margin-bottom: 20px; letter-spacing: 2px; text-transform: uppercase; }
+.login-box label { font-size: 11px; color: #89a; text-transform: uppercase; letter-spacing: 2px; margin: 10px 0 6px; }
 input { background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.12); color: #fff; padding: 14px 16px; border-radius: 10px; font-size: 15px; font-family: inherit; outline: none; transition: .2s; }
 input:focus { border-color: #4af; box-shadow: 0 0 0 3px rgba(68,170,255,0.25); }
 input::placeholder { color: #556; }
 .error-msg { color: #f55; font-size: 12px; min-height: 16px; margin-top: 4px; }
-.login-box .btn { margin-top: 16px; min-width: auto; width: 100%; padding: 14px 24px; font-size: 15px; }
+.login-box .btn { margin-top: 12px; min-width: auto; width: 100%; padding: 14px 24px; font-size: 15px; }
+
+/* Skin grid */
+.skin-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 10px 0 20px; }
+.skin-grid canvas { border-radius: 10px; padding: 4px; cursor: pointer; border: 3px solid transparent; transition: .15s; background: rgba(0,0,0,0.3); width: 100%; height: auto; }
+.skin-grid canvas:hover { background: rgba(255,255,255,0.06); }
+.skin-grid canvas.selected { border-color: #4af; box-shadow: 0 0 20px rgba(68,170,255,0.6); }
 
 /* ============ MAIN MENU ============ */
 #mainMenuScreen { background: radial-gradient(circle at center, #0d1a3a, #03040d); }
@@ -154,15 +195,20 @@ input::placeholder { color: #556; }
 #gameScreen { background: #0a0e27; }
 #game { display: block; width: 100vw; height: 100vh; }
 #hud { position: absolute; inset: 0; pointer-events: none; padding: 16px; }
-#hud button, #hud canvas { pointer-events: auto; }
-#scoreboard { position: absolute; top: 16px; right: 16px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 12px 16px; font-size: 13px; line-height: 1.7; min-width: 180px; backdrop-filter: blur(6px); }
-#zoneIndicator { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 6px; align-items: center; }
-.zone-chip { background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.15); border-radius: 20px; padding: 6px 16px; font-size: 12px; font-weight: 700; letter-spacing: 2px; backdrop-filter: blur(6px); }
+#hud button, #hud canvas, #hud > div { pointer-events: auto; }
+
+#scoreboard { position: absolute; top: 16px; right: 16px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 12px 16px; font-size: 13px; line-height: 1.7; min-width: 160px; backdrop-filter: blur(6px); }
+
+/* BARRES HP/SHIELD */
+#statusBars { position: absolute; bottom: 20px; left: 20px; display: flex; flex-direction: column; gap: 8px; width: 260px; }
+.bar-wrap { display: flex; align-items: center; gap: 10px; }
+.bar-label { font-size: 12px; font-weight: 800; letter-spacing: 2px; width: 30px; text-align: right; color: #cce8ff; }
+.bar { flex: 1; height: 14px; background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; overflow: hidden; position: relative; }
+.bar-fill { height: 100%; transition: width 0.15s linear; border-radius: 8px; }
+.bar-fill.hp { background: linear-gradient(90deg, #4f4, #2a2); box-shadow: 0 0 10px rgba(68,255,68,0.5); }
+.bar-fill.shield { background: linear-gradient(90deg, #fd4, #b80); box-shadow: 0 0 10px rgba(255,221,68,0.5); }
 
 #minimap { position: absolute; bottom: 16px; right: 16px; background: rgba(0,0,0,0.6); border: 2px solid rgba(68,170,255,0.5); border-radius: 10px; box-shadow: 0 0 20px rgba(68,170,255,0.3); }
-
-.announcement { position: absolute; top: 140px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.75); border: 2px solid #4af; border-radius: 12px; padding: 14px 32px; font-size: 20px; font-weight: 800; letter-spacing: 4px; color: #4af; text-shadow: 0 0 20px rgba(68,170,255,0.8); animation: announcePulse 1.5s ease-in-out infinite; }
-@keyframes announcePulse { 0%,100% { transform: translateX(-50%) scale(1); } 50% { transform: translateX(-50%) scale(1.05); } }
 
 /* ============ DEATH SCREEN ============ */
 .death-screen { position: absolute; inset: 0; background: rgba(80, 0, 0, 0.55); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; z-index: 50; animation: deathFadeIn 0.5s ease; }
@@ -176,10 +222,21 @@ input::placeholder { color: #556; }
 .spectate-panel { position: absolute; top: 16px; left: 16px; background: rgba(0,0,0,0.75); border: 2px solid #fd4; border-radius: 12px; padding: 16px; min-width: 260px; z-index: 40; }
 .spectate-title { font-size: 14px; font-weight: 800; letter-spacing: 3px; color: #fd4; margin-bottom: 12px; }
 .spectate-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; max-height: 200px; overflow-y: auto; }
-.spectate-list .spectate-item { padding: 8px 12px; background: rgba(255,255,255,0.06); border-radius: 8px; cursor: pointer; font-size: 13px; transition: .15s; }
-.spectate-list .spectate-item:hover { background: rgba(68,170,255,0.2); }
-.spectate-list .spectate-item.active { background: rgba(255,221,68,0.15); border: 1px solid #fd4; }
+.spectate-item { padding: 8px 12px; background: rgba(255,255,255,0.06); border-radius: 8px; cursor: pointer; font-size: 13px; transition: .15s; }
+.spectate-item:hover { background: rgba(68,170,255,0.2); }
+.spectate-item.active { background: rgba(255,221,68,0.15); border: 1px solid #fd4; }
 .spectate-panel .btn { min-width: auto; width: 100%; padding: 10px 16px; font-size: 13px; }
+
+/* ============ VICTORY ============ */
+.victory-screen { position: fixed; inset: 0; background: radial-gradient(circle at center, rgba(255,200,0,0.35) 0%, rgba(20,10,0,0.85) 60%, rgba(0,0,0,0.95) 100%); backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; z-index: 200; animation: victoryFadeIn 0.8s cubic-bezier(0.22,1,0.36,1); }
+@keyframes victoryFadeIn { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: scale(1); } }
+.victory-content { text-align: center; background: rgba(25,18,0,0.85); border: 3px solid #ffd700; border-radius: 28px; padding: 56px 96px; box-shadow: 0 0 120px rgba(255,215,0,0.6); animation: victoryPulse 2.4s ease-in-out infinite; max-width: 90vw; }
+@keyframes victoryPulse { 0%, 100% { box-shadow: 0 0 100px rgba(255,215,0,0.5); } 50% { box-shadow: 0 0 180px rgba(255,215,0,1); } }
+.victory-trophy { font-size: 100px; margin-bottom: 12px; animation: trophyBounce 1.6s ease-in-out infinite; filter: drop-shadow(0 0 30px rgba(255,215,0,1)); }
+@keyframes trophyBounce { 0%, 100% { transform: translateY(0) rotate(-6deg); } 50% { transform: translateY(-18px) rotate(6deg); } }
+.victory-content h1 { font-size: 72px; font-weight: 900; letter-spacing: 14px; color: #ffd700; text-shadow: 0 0 40px rgba(255,215,0,1); margin-bottom: 16px; }
+.victory-sub { color: #ffe8a0; letter-spacing: 6px; font-size: 14px; margin-bottom: 40px; }
+.victory-content .btn-huge { min-width: 400px !important; font-size: 22px !important; padding: 24px 60px !important; letter-spacing: 6px !important; }
 
 /* ============ MODAL ============ */
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(4px); }
@@ -190,10 +247,6 @@ input::placeholder { color: #556; }
 .skin-option { background: rgba(0,0,0,0.3); border-radius: 10px; padding: 4px; cursor: pointer; border: 2px solid transparent; }
 .skin-option.selected { border-color: #4af; box-shadow: 0 0 16px rgba(68,170,255,0.4); }
 .modal-content .btn { min-width: auto; margin-top: 16px; }
-
-/* ============ BANNIERE SUPPRESSION ============ */
-.delete-banner { background: linear-gradient(90deg, #c22, #f55, #c22); background-size: 200% 100%; animation: bannerScroll 3s linear infinite; padding: 16px 24px; text-align: center; font-weight: 700; letter-spacing: 2px; color: #fff; border-bottom: 2px solid #f00; }
-@keyframes bannerScroll { from { background-position: 0 0; } to { background-position: 200% 0; } }
 
 ::-webkit-scrollbar { width: 8px; }
 ::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); }

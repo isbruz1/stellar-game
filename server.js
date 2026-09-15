@@ -16,25 +16,17 @@ const BULLET_SPEED = 9;
 const BULLET_LIFE = 150;
 const BULLET_DAMAGE = 25;
 const SHOOT_COOLDOWN = 350;
-const RESPAWN_TIME = 3000;
 const MAX_HP = 100;
+const MAX_SHIELD = 100;
 const MAX_PLAYERS = 8;
 
-// ---------- Zones ----------
-const ZONE_TYPES = {
-  heal:   { color: "#4f4", label: "Soin",     radius: 110 },
-  speed:  { color: "#4af", label: "Vitesse",  radius: 110 },
-  damage: { color: "#f55", label: "Dégâts +", radius: 110 },
-  shield: { color: "#fd4", label: "Bouclier", radius: 110 }
-};
+// ---------- Comptes actifs (pour lock multi-onglets) ----------
+const activeAccounts = {}; // pseudoLower -> { socketId, pseudoOriginal }
 
-// ---------- Biomes ----------
-const BIOMES = {
-  grass:   { bg: "#1d3a1a", accent: "#2d5a28", tree: "#0f2410" },
-  desert:  { bg: "#5a4a2a", accent: "#7a6038", tree: "#3a2a1a" },
-  snow:    { bg: "#2a3a4a", accent: "#4a5a6a", tree: "#1a2a3a" },
-  water:   { bg: "#0a2040", accent: "#1a3560", tree: "#000" }
-};
+function broadcastLockedAccounts() {
+  const list = Object.values(activeAccounts).map(a => a.pseudoOriginal);
+  io.emit("locked-accounts", list);
+}
 
 // ---------- Rooms ----------
 const rooms = {};
@@ -46,29 +38,17 @@ function genRoomId() {
   return s;
 }
 
-function genBiomeBlob() {
-  const keys = Object.keys(BIOMES);
-  return {
-    type: keys[Math.floor(Math.random() * keys.length)],
-    x: Math.random() * MAP_W,
-    y: Math.random() * MAP_H,
-    r: 300 + Math.random() * 400
-  };
-}
-
 function genWall() {
   const w = 120 + Math.random() * 300;
   const h = 40 + Math.random() * 120;
   return {
     x: 200 + Math.random() * (MAP_W - 600),
     y: 200 + Math.random() * (MAP_H - 600),
-    w, h,
-    horizontal: Math.random() > 0.5
+    w, h
   };
 }
 
 function genRiver() {
-  // Polyligne de 4-6 points
   const points = [];
   let x = Math.random() * MAP_W;
   let y = 0;
@@ -99,32 +79,14 @@ function genForest() {
   return trees;
 }
 
-function genZone(moving = false) {
-  const keys = Object.keys(ZONE_TYPES);
-  const type = keys[Math.floor(Math.random() * keys.length)];
-  const x = 300 + Math.random() * (MAP_W - 600);
-  const y = 300 + Math.random() * (MAP_H - 600);
-  const z = {
-    id: Math.random().toString(36).slice(2, 8),
-    type,
-    x, y,
-    radius: ZONE_TYPES[type].radius,
-    moving: false,
-    vx: 0, vy: 0,
-    moveTimer: 0
-  };
-  if (moving) startZoneMove(z);
-  return z;
-}
-
-function startZoneMove(z) {
-  const angle = Math.random() * Math.PI * 2;
-  const speed = 1.2 + Math.random() * 1.2;
-  z.moving = true;
-  z.vx = Math.cos(angle) * speed;
-  z.vy = Math.sin(angle) * speed;
-  z.moveTimer = 200 + Math.floor(Math.random() * 200); // 3-6s
-  z.stopped = false;
+function generateMap() {
+  const walls = [];
+  for (let i = 0; i < 18; i++) walls.push(genWall());
+  const rivers = [];
+  for (let i = 0; i < 2; i++) rivers.push(genRiver());
+  const forests = [];
+  for (let i = 0; i < 6; i++) forests.push(genForest());
+  return { walls, rivers, forests };
 }
 
 function createRoom(name, hostId) {
@@ -138,27 +100,12 @@ function createRoom(name, hostId) {
     bullets: [],
     bulletSeq: 0,
     gameStarted: false,
-    zones: [],
-    zoneTimer: 0,
     mapData: null,
     maxPlayers: MAX_PLAYERS,
-    announcement: null,
-    announcementTime: 0
+    victoryDeclared: false
   };
   rooms[id] = r;
   return r;
-}
-
-function generateMap() {
-  const walls = [];
-  for (let i = 0; i < 18; i++) walls.push(genWall());
-  const rivers = [];
-  for (let i = 0; i < 2; i++) rivers.push(genRiver());
-  const forests = [];
-  for (let i = 0; i < 6; i++) forests.push(genForest());
-  const biomes = [];
-  for (let i = 0; i < 6; i++) biomes.push(genBiomeBlob());
-  return { walls, rivers, forests, biomes };
 }
 
 function publicPlayers(room) {
@@ -178,18 +125,14 @@ function buildState(room) {
     const pl = room.players[id];
     p[id] = {
       id, x: pl.x, y: pl.y, angle: pl.angle, skin: pl.skin,
-      hp: pl.hp, alive: pl.alive, pseudo: pl.pseudo, realName: pl.realName,
-      speedBoost: pl.speedBoost || 0, shield: pl.shield || 0,
-      damageBoost: pl.damageBoost || 0,
-      spectators: pl.spectators || 0
+      hp: pl.hp, shield: pl.shield, alive: pl.alive,
+      pseudo: pl.pseudo, realName: pl.realName
     };
   }
   return {
     players: p,
     bullets: room.bullets.map(b => ({ id: b.id, x: b.x, y: b.y })),
-    zones: room.zones,
-    mapData: room.mapData,
-    announcement: room.announcement
+    mapData: room.mapData
   };
 }
 
@@ -217,11 +160,8 @@ function roomList() {
 
 function isInsideWall(walls, x, y, r) {
   for (const w of walls) {
-    // Approximation rectangle élargi
     if (x + r > w.x && x - r < w.x + w.w &&
-        y + r > w.y && y - r < w.y + w.h) {
-      return true;
-    }
+        y + r > w.y && y - r < w.y + w.h) return true;
   }
   return false;
 }
@@ -238,9 +178,7 @@ function isInsideTree(forests, x, y, r) {
 function resetForGame(room) {
   room.bullets = [];
   room.mapData = generateMap();
-  room.zones = [];
-  for (let i = 0; i < 5; i++) room.zones.push(genZone(i < 2));
-  room.zoneTimer = 0;
+  room.victoryDeclared = false;
 
   const ids = Object.keys(room.players);
   ids.forEach((id, i) => {
@@ -250,13 +188,9 @@ function resetForGame(room) {
     p.y = MAP_H / 2 + Math.sin(a) * 400;
     p.angle = a + Math.PI;
     p.hp = MAX_HP;
+    p.shield = MAX_SHIELD;
     p.alive = true;
     p.lastShot = 0;
-    p.speedBoost = 0;
-    p.shield = 0;
-    p.damageBoost = 0;
-    p.spectators = 0;
-    p.spectating = null;
   });
 }
 
@@ -265,21 +199,34 @@ io.on("connection", socket => {
   let currentRoom = null;
 
   socket.emit("room-list-update", roomList());
+  socket.emit("locked-accounts", Object.values(activeAccounts).map(a => a.pseudoOriginal));
 
   socket.on("list-rooms", () => socket.emit("room-list-update", roomList()));
 
-  socket.on("delete-account", pseudo => {
-    // Retire le joueur de tous les rooms (déconnexion forcée)
-    for (const rid in rooms) {
-      const room = rooms[rid];
-      if (room.players[socket.id] && room.players[socket.id].pseudo === pseudo) {
-        handleLeave(rid, socket.id);
-        socket.emit("account-deleted");
-        return;
-      }
+  // ===== Comptes (lock multi-onglets) =====
+  socket.on("claim-account", pseudo => {
+    const key = String(pseudo || "").toLowerCase();
+    if (!key) return socket.emit("claim-result", { ok: false, reason: "pseudo invalide" });
+
+    const existing = activeAccounts[key];
+    if (existing && existing.socketId !== socket.id) {
+      socket.emit("claim-result", { ok: false, reason: "Ce compte est déjà utilisé ailleurs." });
+      return;
+    }
+    activeAccounts[key] = { socketId: socket.id, pseudoOriginal: pseudo };
+    socket.emit("claim-result", { ok: true });
+    broadcastLockedAccounts();
+  });
+
+  socket.on("release-account", pseudo => {
+    const key = String(pseudo || "").toLowerCase();
+    if (activeAccounts[key] && activeAccounts[key].socketId === socket.id) {
+      delete activeAccounts[key];
+      broadcastLockedAccounts();
     }
   });
 
+  // ===== Rooms =====
   socket.on("create-room", data => {
     const room = createRoom(data.name, socket.id);
     currentRoom = room.id;
@@ -306,8 +253,7 @@ io.on("connection", socket => {
       skin: Number(data.skin) || 0,
       ready: false,
       x: MAP_W / 2, y: MAP_H / 2, angle: 0,
-      hp: MAX_HP, alive: true, lastShot: 0,
-      speedBoost: 0, shield: 0, damageBoost: 0,
+      hp: MAX_HP, shield: MAX_SHIELD, alive: true, lastShot: 0,
       spectators: 0, spectating: null
     };
     socket.emit("room-joined", { id: room.id, name: room.name });
@@ -358,7 +304,6 @@ io.on("connection", socket => {
     if (guests.length > 0 && !guests.every(p => p.ready)) return;
     resetForGame(room);
     room.gameStarted = true;
-    room.announcement = "LA PARTIE COMMENCE !";
     io.to(room.id).emit("game-started");
     io.to(room.id).emit("state", buildState(room));
   });
@@ -370,13 +315,11 @@ io.on("connection", socket => {
     if (p) {
       p.ready = false;
       p.hp = MAX_HP;
+      p.shield = MAX_SHIELD;
       p.alive = true;
       p.spectating = null;
-      // Retirer ce joueur du spectate des autres
       for (const id in room.players) {
-        if (room.players[id].spectating === socket.id) {
-          room.players[id].spectating = null;
-        }
+        if (room.players[id].spectating === socket.id) room.players[id].spectating = null;
       }
     }
     if (socket.id === room.hostId) {
@@ -393,8 +336,6 @@ io.on("connection", socket => {
     const p = room.players[socket.id];
     const target = room.players[targetId];
     if (!p || !target) return;
-
-    // Retirer de l'ancien
     if (p.spectating) {
       const old = room.players[p.spectating];
       if (old) old.spectators = Math.max(0, (old.spectators || 0) - 1);
@@ -426,17 +367,15 @@ io.on("connection", socket => {
     if (k.left) dx -= 1;
     if (k.right) dx += 1;
     const len = Math.hypot(dx, dy);
-    const speed = PLAYER_SPEED * (1 + (p.speedBoost > 0 ? 0.6 : 0));
 
     let nx = p.x, ny = p.y;
     if (len > 0) {
-      nx += (dx / len) * speed;
-      ny += (dy / len) * speed;
+      nx += (dx / len) * PLAYER_SPEED;
+      ny += (dy / len) * PLAYER_SPEED;
     }
     nx = Math.max(PLAYER_RADIUS, Math.min(MAP_W - PLAYER_RADIUS, nx));
     ny = Math.max(PLAYER_RADIUS, Math.min(MAP_H - PLAYER_RADIUS, ny));
 
-    // Collision murs + arbres
     const md = room.mapData;
     if (md) {
       if (!isInsideWall(md.walls, nx, p.y, PLAYER_RADIUS)) p.x = nx;
@@ -459,8 +398,6 @@ io.on("connection", socket => {
     p.lastShot = now;
     if (typeof data.angle === "number") p.angle = data.angle;
 
-    const dmg = p.damageBoost > 0 ? BULLET_DAMAGE * 1.5 : BULLET_DAMAGE;
-
     room.bullets.push({
       id: ++room.bulletSeq,
       x: p.x + Math.cos(p.angle) * 34,
@@ -468,12 +405,18 @@ io.on("connection", socket => {
       vx: Math.cos(p.angle) * BULLET_SPEED,
       vy: Math.sin(p.angle) * BULLET_SPEED,
       owner: socket.id,
-      life: BULLET_LIFE,
-      damage: dmg
+      life: BULLET_LIFE
     });
   });
 
   socket.on("disconnect", () => {
+    // Libère les comptes liés à ce socket
+    for (const key in activeAccounts) {
+      if (activeAccounts[key].socketId === socket.id) {
+        delete activeAccounts[key];
+      }
+    }
+    broadcastLockedAccounts();
     if (currentRoom) handleLeave(currentRoom, socket.id);
   });
 
@@ -506,66 +449,9 @@ io.on("connection", socket => {
 
 // ---------- Tick ----------
 function tick() {
-  const now = Date.now();
   for (const rid in rooms) {
     const room = rooms[rid];
     if (!room.gameStarted) continue;
-
-    // Zones : mouvement + respawn
-    room.zoneTimer++;
-    if (room.zoneTimer > 60 * 10) {
-      room.zoneTimer = 0;
-      if (room.zones.length > 3) room.zones.shift();
-      room.zones.push(genZone(true));
-    }
-
-    for (const z of room.zones) {
-      if (z.moving && z.moveTimer > 0) {
-        z.x += z.vx;
-        z.y += z.vy;
-        z.moveTimer--;
-        // Rebond sur les bords
-        if (z.x < z.radius || z.x > MAP_W - z.radius) { z.vx *= -1; z.x = Math.max(z.radius, Math.min(MAP_W - z.radius, z.x)); }
-        if (z.y < z.radius || z.y > MAP_H - z.radius) { z.vy *= -1; z.y = Math.max(z.radius, Math.min(MAP_H - z.radius, z.y)); }
-      } else if (z.moving && z.moveTimer <= 0) {
-        z.moving = false;
-        z.stopped = true;
-        room.announcement = "🛑 LA ZONE S'ARRÊTE";
-        room.announcementTime = 60 * 2;
-      }
-    }
-
-    // Annonce de mouvement
-    if (!room.announcement || room.announcementTime <= 0) {
-      const moving = room.zones.find(z => z.moving);
-      if (moving && Math.random() < 0.005) {
-        room.announcement = "🌪️ LA ZONE SE DÉPLACE";
-        room.announcementTime = 60 * 2;
-      }
-    }
-    if (room.announcementTime > 0) room.announcementTime--;
-
-    // Boosts
-    for (const id in room.players) {
-      const p = room.players[id];
-      if (p.speedBoost > 0) p.speedBoost--;
-      if (p.shield > 0) p.shield--;
-      if (p.damageBoost > 0) p.damageBoost--;
-    }
-
-    // Effets zones
-    for (const id in room.players) {
-      const p = room.players[id];
-      if (!p.alive) continue;
-      for (const z of room.zones) {
-        if (Math.hypot(p.x - z.x, p.y - z.y) < z.radius) {
-          if (z.type === "heal") p.hp = Math.min(MAX_HP, p.hp + 0.3);
-          else if (z.type === "speed") p.speedBoost = 60;
-          else if (z.type === "shield") p.shield = 120;
-          else if (z.type === "damage") p.damageBoost = 90;
-        }
-      }
-    }
 
     // Balles
     for (let i = room.bullets.length - 1; i >= 0; i--) {
@@ -574,8 +460,6 @@ function tick() {
 
       let dead = false;
       if (b.life <= 0 || b.x < 0 || b.x > MAP_W || b.y < 0 || b.y > MAP_H) dead = true;
-
-      // Collision mur
       if (!dead && room.mapData && isInsideWall(room.mapData.walls, b.x, b.y, 4)) dead = true;
 
       if (dead) { room.bullets.splice(i, 1); continue; }
@@ -586,32 +470,51 @@ function tick() {
         const p = room.players[id];
         if (!p.alive) continue;
         if (Math.hypot(p.x - b.x, p.y - b.y) < PLAYER_RADIUS) {
-          let dmg = b.damage || BULLET_DAMAGE;
-          if (p.shield > 0) dmg *= 0.3;
-          p.hp -= dmg;
+          let dmg = BULLET_DAMAGE;
+
+          // Bouclier absorbe d'abord
+          if (p.shield > 0) {
+            const absorbed = Math.min(p.shield, dmg);
+            p.shield -= absorbed;
+            dmg -= absorbed;
+          }
+          if (dmg > 0) p.hp -= dmg;
+
           hit = true;
           if (p.hp <= 0) {
             p.hp = 0;
             p.alive = false;
-            const pid = id;
-            // Reset après respawn
-            setTimeout(() => {
-              const pp = room.players[pid];
-              if (pp && room.gameStarted) {
-                pp.hp = MAX_HP;
-                pp.alive = true;
-                pp.x = Math.random() * MAP_W;
-                pp.y = Math.random() * MAP_H;
-                pp.shield = 0;
-                pp.speedBoost = 0;
-                pp.damageBoost = 0;
-              }
-            }, RESPAWN_TIME * 4);
           }
           break;
         }
       }
       if (hit) room.bullets.splice(i, 1);
+    }
+
+    // ===== Détection victoire =====
+    const aliveIds = Object.keys(room.players).filter(id => room.players[id].alive);
+    const totalPlayers = Object.keys(room.players).length;
+
+    if (totalPlayers >= 2 && aliveIds.length === 1 && !room.victoryDeclared) {
+      const winnerId = aliveIds[0];
+      room.victoryDeclared = true;
+      room.gameStarted = false;
+      room.bullets = [];
+
+      io.to(room.id).emit("victory", { winnerId });
+
+      for (const id in room.players) {
+        const p = room.players[id];
+        p.ready = false;
+        p.hp = MAX_HP;
+        p.shield = MAX_SHIELD;
+        p.alive = true;
+        p.spectating = null;
+        p.spectators = 0;
+      }
+
+      io.to(room.id).emit("game-ended");
+      broadcastLobby(room);
     }
 
     io.to(room.id).emit("state", buildState(room));

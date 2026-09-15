@@ -30,7 +30,7 @@
   <div class="profiles-header">
     <img src="assets/stellar.png" class="mini-logo">
     <h1>CHOISIS TON PROFIL</h1>
-    <p class="muted">Sélectionne un compte ou crées-en un nouveau</p>
+    <p class="muted">Sélectionne un compte ou crée-en un nouveau</p>
   </div>
 
   <div class="profiles-content">
@@ -38,10 +38,14 @@
 
     <div class="account-right">
       <div class="selected-preview">
-        <canvas id="previewCanvas" width="220" height="220"></canvas>
+        <canvas id="previewCanvas" width="200" height="200"></canvas>
         <div id="previewPseudo" class="preview-pseudo">—</div>
         <div id="previewReal" class="preview-real">—</div>
-        <button id="enterLobbyBtn" class="btn btn-green" disabled>JOUER AVEC CE COMPTE</button>
+
+        <div class="preview-skins-label">TON TANK</div>
+        <div id="previewSkinPicker" class="preview-skins"></div>
+
+        <button id="enterLobbyBtn" class="btn btn-green" disabled>JOUER</button>
       </div>
     </div>
   </div>
@@ -59,7 +63,7 @@
     <div class="login-glow"></div>
     <img src="assets/stellar.png" class="login-logo">
     <h1>NOUVEAU PILOTE</h1>
-    <p class="login-sub">Crée ton profil</p>
+    <p class="login-sub">Étape 1/2 — Ton identité</p>
 
     <label>Pseudo (5 car. min.)</label>
     <input id="pseudoInput" type="text" maxlength="16" autocomplete="off" spellcheck="false">
@@ -68,8 +72,25 @@
     <label>Nom réel</label>
     <input id="realNameInput" type="text" maxlength="32" autocomplete="off" spellcheck="false">
 
-    <button id="createAccountBtn" class="btn btn-green" disabled>CRÉER</button>
+    <button id="nextToSkinBtn" class="btn btn-green" disabled>SUIVANT →</button>
     <button id="backToProfilesBtn" class="btn btn-red">ANNULER</button>
+  </div>
+</div>
+
+<!-- ============ SKIN SELECTION ============ -->
+<div id="skinSelectScreen" class="screen new-account-screen hidden">
+  <canvas id="skinSelectCanvas"></canvas>
+
+  <div class="login-box">
+    <div class="login-glow"></div>
+    <img src="assets/stellar.png" class="login-logo">
+    <h1>CHOISIS TON TANK</h1>
+    <p class="login-sub">Étape 2/2</p>
+
+    <div id="skinGrid" class="skin-grid"></div>
+
+    <button id="finishAccountBtn" class="btn btn-green">TERMINER ✓</button>
+    <button id="backToNameBtn" class="btn btn-red">← RETOUR</button>
   </div>
 </div>
 
@@ -166,13 +187,21 @@
   <div id="hud">
     <button id="leaveGameBtn" class="icon-btn" title="Retour au salon">←</button>
     <div id="scoreboard"></div>
-    <div id="zoneIndicator"></div>
+
+    <!-- BARRES HP + SHIELD -->
+    <div id="statusBars">
+      <div class="bar-wrap">
+        <div class="bar-label">HP</div>
+        <div class="bar"><div id="hpBar" class="bar-fill hp"></div></div>
+      </div>
+      <div class="bar-wrap">
+        <div class="bar-label">🛡</div>
+        <div class="bar"><div id="shieldBar" class="bar-fill shield"></div></div>
+      </div>
+    </div>
 
     <!-- MINI MAP -->
     <canvas id="minimap" width="180" height="180"></canvas>
-
-    <!-- BANDEAU ANNONCE -->
-    <div id="announcement" class="announcement hidden"></div>
   </div>
 
   <!-- DEATH SCREEN -->
@@ -187,11 +216,21 @@
     </div>
   </div>
 
-  <!-- SPECTATE PANEL -->
+  <!-- SPECTATE -->
   <div id="spectatePanel" class="spectate-panel hidden">
     <div class="spectate-title">👁 MODE SPECTATEUR</div>
     <div id="spectateList" class="spectate-list"></div>
     <button id="stopSpectateBtn" class="btn btn-red">STOP</button>
+  </div>
+</div>
+
+<!-- ============ VICTORY ============ -->
+<div id="victoryScreen" class="victory-screen hidden">
+  <div class="victory-content">
+    <div class="victory-trophy">🏆</div>
+    <h1>VICTOIRE</h1>
+    <p class="victory-sub">DERNIER SURVIVANT DE LA GALAXIE</p>
+    <button id="returnToServerBtn" class="btn btn-green btn-huge">RETOUR AU SERVEUR</button>
   </div>
 </div>
 
