@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1">
   <title>Stellar Game</title>
   <link rel="stylesheet" href="style.css">
 </head>
@@ -18,7 +18,13 @@
       <img src="assets/stellar.png" class="splash-logo">
     </div>
     <div class="splash-title">STELLAR&nbsp;GAME</div>
-    <div class="splash-tagline">CHARGEMENT DE LA GALAXIE</div>
+
+    <!-- BADGE DE DÉTECTION APPAREIL -->
+    <div id="deviceBadge" class="device-badge">
+      <span id="deviceIcon">🔍</span>
+      <span id="deviceLabel">DÉTECTION…</span>
+    </div>
+
     <div class="splash-loader"><div class="splash-loader-bar"></div></div>
   </div>
 </div>
@@ -26,30 +32,24 @@
 <!-- ============ PROFILES ============ -->
 <div id="profilesScreen" class="screen profiles-screen hidden">
   <canvas id="profilesCanvas"></canvas>
-
   <div class="profiles-header">
     <img src="assets/stellar.png" class="mini-logo">
     <h1>CHOISIS TON PROFIL</h1>
     <p class="muted">Sélectionne un compte ou crée-en un nouveau</p>
   </div>
-
   <div class="profiles-content">
     <div id="accountList" class="account-list"></div>
-
     <div class="account-right">
       <div class="selected-preview">
         <canvas id="previewCanvas" width="200" height="200"></canvas>
         <div id="previewPseudo" class="preview-pseudo">—</div>
         <div id="previewReal" class="preview-real">—</div>
-
         <div class="preview-skins-label">TON TANK</div>
         <div id="previewSkinPicker" class="preview-skins"></div>
-
         <button id="enterLobbyBtn" class="btn btn-green" disabled>JOUER</button>
       </div>
     </div>
   </div>
-
   <div class="profiles-footer">
     <button id="newAccountBtn" class="btn btn-yellow">+ NOUVEAU COMPTE</button>
   </div>
@@ -58,37 +58,30 @@
 <!-- ============ NEW ACCOUNT ============ -->
 <div id="newAccountScreen" class="screen new-account-screen hidden">
   <canvas id="newAccountCanvas"></canvas>
-
   <div class="login-box">
     <div class="login-glow"></div>
     <img src="assets/stellar.png" class="login-logo">
     <h1>NOUVEAU PILOTE</h1>
     <p class="login-sub">Étape 1/2 — Ton identité</p>
-
     <label>Pseudo (5 car. min.)</label>
     <input id="pseudoInput" type="text" maxlength="16" autocomplete="off" spellcheck="false">
     <div id="pseudoError" class="error-msg"></div>
-
     <label>Nom réel</label>
     <input id="realNameInput" type="text" maxlength="32" autocomplete="off" spellcheck="false">
-
     <button id="nextToSkinBtn" class="btn btn-green" disabled>SUIVANT →</button>
     <button id="backToProfilesBtn" class="btn btn-red">ANNULER</button>
   </div>
 </div>
 
-<!-- ============ SKIN SELECTION ============ -->
+<!-- ============ SKIN SELECT ============ -->
 <div id="skinSelectScreen" class="screen new-account-screen hidden">
   <canvas id="skinSelectCanvas"></canvas>
-
   <div class="login-box">
     <div class="login-glow"></div>
     <img src="assets/stellar.png" class="login-logo">
     <h1>CHOISIS TON TANK</h1>
     <p class="login-sub">Étape 2/2</p>
-
     <div id="skinGrid" class="skin-grid"></div>
-
     <button id="finishAccountBtn" class="btn btn-green">TERMINER ✓</button>
     <button id="backToNameBtn" class="btn btn-red">← RETOUR</button>
   </div>
@@ -97,7 +90,6 @@
 <!-- ============ MAIN MENU ============ -->
 <div id="mainMenuScreen" class="screen hidden">
   <canvas id="menuCanvas"></canvas>
-
   <div class="top-bar">
     <div class="logo">
       <img src="assets/stellar.png" class="logo-img">
@@ -111,13 +103,11 @@
       <button id="disconnectBtn" class="icon-btn" title="Déconnexion">🚪</button>
     </div>
   </div>
-
   <div class="menu-content">
     <h1 class="menu-title">PRÊT POUR LE DÉCOLLAGE ?</h1>
-    <p class="menu-sub">Rejoins une partie ou crée ton propre serveur</p>
+    <p class="menu-sub" id="controlsHint">Rejoins une partie ou crée ton propre serveur</p>
     <button id="playBtn" class="btn btn-green btn-huge">JOUER</button>
   </div>
-
   <div class="menu-footer">
     <span id="onlineCount">0 serveur actif</span>
   </div>
@@ -130,12 +120,10 @@
     <h2>NAVIGATEUR DE SERVEURS</h2>
     <div style="width:44px"></div>
   </div>
-
   <div class="browser-tabs">
     <button class="tab-btn active" data-tab="join">REJOINDRE</button>
     <button class="tab-btn" data-tab="create">CRÉER</button>
   </div>
-
   <div id="tab-join" class="tab-panel">
     <div class="join-by-code">
       <input id="codeInput" type="text" maxlength="5" placeholder="CODE" autocomplete="off">
@@ -147,7 +135,6 @@
     </div>
     <div id="roomsList" class="rooms-list"></div>
   </div>
-
   <div id="tab-create" class="tab-panel hidden">
     <div class="create-form">
       <label>Nom du serveur</label>
@@ -168,12 +155,10 @@
       <div class="room-code-chip">CODE : <strong id="roomCodeDisplay">—</strong></div>
     </div>
   </div>
-
   <div class="lobby-content">
     <h2>SALON <span id="playerCount">(0)</span> <span id="roomNameDisplay" class="room-name"></span></h2>
     <div class="players-grid" id="playersGrid"></div>
   </div>
-
   <div class="bottom-bar">
     <button id="quitBtn" class="btn btn-red hidden">QUITTER LE SERVEUR</button>
     <button id="actionBtn" class="btn btn-green" disabled>...</button>
@@ -186,9 +171,9 @@
 
   <div id="hud">
     <button id="leaveGameBtn" class="icon-btn" title="Retour au salon">←</button>
+    <div id="aliveCounter" class="alive-counter"></div>
     <div id="scoreboard"></div>
 
-    <!-- BARRES HP + SHIELD -->
     <div id="statusBars">
       <div class="bar-wrap">
         <div class="bar-label">HP</div>
@@ -200,8 +185,19 @@
       </div>
     </div>
 
-    <!-- MINI MAP -->
     <canvas id="minimap" width="180" height="180"></canvas>
+  </div>
+
+  <!-- TOUCH CONTROLS -->
+  <div id="touchControls" class="touch-controls hidden">
+    <div id="joystickZone" class="joystick-zone">
+      <div id="joystickBase" class="joystick-base hidden">
+        <div id="joystickKnob" class="joystick-knob"></div>
+      </div>
+    </div>
+    <div id="shootZone" class="shoot-zone">
+      <div id="shootBtn" class="shoot-btn hidden">🔴</div>
+    </div>
   </div>
 
   <!-- DEATH SCREEN -->
@@ -216,7 +212,6 @@
     </div>
   </div>
 
-  <!-- SPECTATE -->
   <div id="spectatePanel" class="spectate-panel hidden">
     <div class="spectate-title">👁 MODE SPECTATEUR</div>
     <div id="spectateList" class="spectate-list"></div>

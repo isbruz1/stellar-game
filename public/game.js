@@ -1,8 +1,155 @@
 /* ==================================================================
-   STELLAR GAME — Client V5
+   STELLAR GAME — Client V6 (Universal)
+   Support : PC / Mobile / Xbox / PlayStation / Steam Deck
    ================================================================== */
 
-// ---------- Accounts ----------
+// ==================================================================
+//  DÉTECTION APPAREIL
+// ==================================================================
+const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+const userAgent = navigator.userAgent.toLowerCase();
+
+let deviceType = "desktop"; // desktop | mobile | tablet | console
+let gamepadType = null;     // xbox | playstation | generic
+let hasGamepad = false;
+
+function detectDevice() {
+  // Détection console / manette branchée
+  const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+  for (const gp of gamepads) {
+    if (gp) {
+      hasGamepad = true;
+      gamepadType = detectGamepadType(gp.id);
+      break;
+    }
+  }
+
+  // Détection type d'appareil
+  if (hasGamepad) {
+    deviceType = "console";
+  } else if (isTouchDevice) {
+    deviceType = window.innerWidth >= 1024 ? "tablet" : "mobile";
+  } else {
+    deviceType = "desktop";
+  }
+
+  return { deviceType, gamepadType, hasGamepad };
+}
+
+function detectGamepadType(id) {
+  const s = (id || "").toLowerCase();
+  if (s.includes("xbox") || s.includes("xinput")) return "xbox";
+  if (s.includes("playstation") || s.includes("dualshock") ||
+      s.includes("dualsense") || s.includes("sony")) return "playstation";
+  if (s.includes("steam")) return "steam";
+  if (s.includes("nintendo") || s.includes("switch") || s.includes("joy-con")) return "nintendo";
+  return "generic";
+}
+
+// Application au body
+function applyDeviceClass() {
+  document.body.className = document.body.className
+    .split(" ").filter(c => !c.startsWith("device-")).join(" ");
+  document.body.classList.add("device-" + deviceType);
+}
+
+// ==================================================================
+//  BADGE DE DÉTECTION (écran splash)
+// ==================================================================
+function updateDeviceBadge() {
+  const badge = document.getElementById("deviceBadge");
+  const icon = document.getElementById("deviceIcon");
+  const label = document.getElementById("deviceLabel");
+  if (!badge || !icon || !label) return;
+
+  badge.className = "device-badge detected";
+
+  if (deviceType === "console") {
+    badge.classList.add("gamepad");
+    icon.textContent = gamepadType === "playstation" ? "🎮" :
+                       gamepadType === "xbox" ? "🎮" :
+                       gamepadType === "nintendo" ? "🎮" : "🎮";
+    const name = gamepadType === "xbox" ? "XBOX" :
+                 gamepadType === "playstation" ? "PLAYSTATION" :
+                 gamepadType === "nintendo" ? "NINTENDO" :
+                 gamepadType === "steam" ? "STEAM" : "MANETTE";
+    label.textContent = `${name} DÉTECTÉ`;
+  } else if (deviceType === "mobile") {
+    badge.classList.add("mobile");
+    icon.textContent = "📱";
+    label.textContent = "MODE MOBILE · TACTILE";
+  } else if (deviceType === "tablet") {
+    badge.classList.add("mobile");
+    icon.textContent = "📱";
+    label.textContent = "MODE TABLETTE";
+  } else {
+    icon.textContent = "💻";
+    label.textContent = "MODE PC · CLAVIER + SOURIS";
+  }
+}
+
+// Mise à jour du texte d'aide dans le menu
+function updateControlsHint() {
+  const hint = document.getElementById("controlsHint");
+  if (!hint) return;
+
+  if (deviceType === "console") {
+    const shootKey = gamepadType === "playstation" ? "R2" : "RT";
+    const aimKey = gamepadType === "playstation" ? "STICK D." : "STICK D.";
+    hint.innerHTML = `
+      <span class="ctrl-key">STICK G.</span> bouger
+      <span class="ctrl-key">${aimKey}</span> viser
+      <span class="ctrl-key">${shootKey}</span> tirer
+    `;
+  } else if (deviceType === "mobile" || deviceType === "tablet") {
+    hint.innerHTML = `
+      <span class="ctrl-key">👈 JOYSTICK</span> bouger
+      <span class="ctrl-key">👉 TAP</span> tirer
+    `;
+  } else {
+    hint.innerHTML = `
+      <span class="ctrl-key">ZQSD</span> bouger
+      <span class="ctrl-key">SOURIS</span> viser
+      <span class="ctrl-key">CLIC</span> tirer
+    `;
+  }
+}
+
+// Détection initiale
+detectDevice();
+applyDeviceClass();
+updateControlsHint();
+
+// Détection en direct (manette branchée/débranchée)
+window.addEventListener("gamepadconnected", e => {
+  console.log("🎮 Manette connectée :", e.gamepad.id);
+  detectDevice();
+  applyDeviceClass();
+  updateControlsHint();
+  updateDeviceBadge();
+});
+window.addEventListener("gamepaddisconnected", e => {
+  console.log("🎮 Manette déconnectée");
+  detectDevice();
+  applyDeviceClass();
+  updateControlsHint();
+});
+
+// Changement de taille (rotation, resize)
+window.addEventListener("resize", () => {
+  const newType = !hasGamepad && isTouchDevice
+    ? (window.innerWidth >= 1024 ? "tablet" : "mobile")
+    : (hasGamepad ? "console" : "desktop");
+  if (newType !== deviceType) {
+    deviceType = newType;
+    applyDeviceClass();
+    updateControlsHint();
+  }
+});
+
+// ==================================================================
+//  ACCOUNTS
+// ==================================================================
 function loadAccounts() {
   try { return JSON.parse(localStorage.getItem("accounts") || "[]"); }
   catch { return []; }
@@ -14,7 +161,9 @@ let currentAccount = null;
 let selectedAccountIdx = -1;
 let tempSkin = 0;
 
-// ---------- Runtime ----------
+// ==================================================================
+//  RUNTIME
+// ==================================================================
 let myId = null, hostId = null, currentRoomId = null;
 let lobbyPlayers = {}, gameStarted = false;
 let serverState = { players: {}, bullets: [], mapData: null };
@@ -24,13 +173,15 @@ const keys = { up: false, down: false, left: false, right: false };
 let socket = null;
 let lockedAccounts = [];
 
-// Damage numbers & effects
+// Effets visuels
 let damageNumbers = [];
 let shieldBreakFx = [];
 let shakeTime = 0;
 let shakeIntensity = 0;
 
-// ---------- DOM ----------
+// ==================================================================
+//  DOM
+// ==================================================================
 const $ = id => document.getElementById(id);
 const splashScreen     = $("splashScreen");
 const profilesScreen   = $("profilesScreen");
@@ -91,7 +242,9 @@ const mmCtx = minimap.getContext("2d");
 const hpBar = $("hpBar");
 const shieldBar = $("shieldBar");
 
-// ---------- Screens ----------
+// ==================================================================
+//  NAVIGATION ÉCRANS
+// ==================================================================
 function showScreen(name) {
   [splashScreen, profilesScreen, newAccountScreen, skinSelectScreen,
    mainMenu, serverBrowser, lobbyScreen, gameScreen]
@@ -192,29 +345,22 @@ function connectSocket() {
     keys.up = keys.down = keys.left = keys.right = false;
   });
 
-  socket.on("game-ended", () => {
-    gameStarted = false;
-  });
+  socket.on("game-ended", () => { gameStarted = false; });
 
   socket.on("victory", data => {
     gameStarted = false;
     $("deathScreen").classList.add("hidden");
     $("spectatePanel").classList.add("hidden");
-    if (data.winnerId === myId) {
-      $("victoryScreen").classList.remove("hidden");
-    }
+    if (data.winnerId === myId) $("victoryScreen").classList.remove("hidden");
   });
 
-  // ===== DAMAGE NUMBERS =====
   socket.on("hit", data => {
     if (data.shieldDamage > 0) {
       damageNumbers.push({
         x: data.x + (Math.random() - 0.5) * 30,
         y: data.y - 30,
         value: Math.round(data.shieldDamage),
-        color: "#4af",
-        life: 60,
-        vy: -1.2
+        color: "#4af", life: 60, vy: -1.2
       });
     }
     if (data.hpDamage > 0) {
@@ -222,23 +368,15 @@ function connectSocket() {
         x: data.x + (Math.random() - 0.5) * 30,
         y: data.y - 50,
         value: Math.round(data.hpDamage),
-        color: "#fff",
-        life: 60,
-        vy: -1.4
+        color: "#fff", life: 60, vy: -1.4
       });
     }
   });
 
-  // ===== BOUCLIER DÉTRUIT =====
   socket.on("shield-broken", data => {
-    shieldBreakFx.push({
-      x: data.x,
-      y: data.y,
-      life: 50
-    });
+    shieldBreakFx.push({ x: data.x, y: data.y, life: 50 });
   });
 
-  // ===== SCREEN SHAKE =====
   socket.on("screen-shake", () => {
     shakeTime = 30;
     shakeIntensity = 14;
@@ -248,10 +386,8 @@ function connectSocket() {
     serverState = s;
     const me = s.players[myId];
     if (!me) return;
-
     hpBar.style.width = (me.hp / 100 * 100) + "%";
     shieldBar.style.width = (me.shield / 100 * 100) + "%";
-
     if (!me.alive && !dead && gameStarted) {
       dead = true;
       $("deathScreen").classList.remove("hidden");
@@ -268,7 +404,7 @@ function connectSocket() {
 connectSocket();
 
 // ==================================================================
-//  BACKGROUND étoiles
+//  BACKGROUNDS
 // ==================================================================
 function initStarfield(canvasId, opacity = 0.5) {
   const c = $(canvasId);
@@ -300,9 +436,7 @@ function initStarfield(canvasId, opacity = 0.5) {
   })();
 }
 
-// ==================================================================
-//  SPLASH GALAXY
-// ==================================================================
+// Splash galaxy
 (function initGalaxy() {
   const c = $("galaxyCanvas");
   const g = c.getContext("2d");
@@ -361,6 +495,24 @@ function initStarfield(canvasId, opacity = 0.5) {
 //  FLOW DÉMARRAGE
 // ==================================================================
 showScreen("splash");
+
+// Détection manette en continu pendant le splash
+const detectInterval = setInterval(() => {
+  const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+  let found = false;
+  for (const gp of gamepads) if (gp) { found = true; break; }
+  if (found !== hasGamepad) {
+    detectDevice();
+    applyDeviceClass();
+    updateControlsHint();
+  }
+}, 500);
+
+setTimeout(() => {
+  clearInterval(detectInterval);
+  updateDeviceBadge();
+}, 1500);
+
 setTimeout(() => {
   window.__stopGalaxy && window.__stopGalaxy();
   showScreen("profiles");
@@ -390,7 +542,6 @@ function renderAccounts() {
     const card = document.createElement("div");
     card.className = "account-card";
     const locked = isAccountLocked(acc.pseudo);
-
     if (idx === selectedAccountIdx) card.classList.add("selected");
     if (locked) card.classList.add("locked");
 
@@ -400,23 +551,20 @@ function renderAccounts() {
     card.appendChild(c);
 
     const n = document.createElement("div");
-    n.className = "name";
-    n.textContent = acc.pseudo;
+    n.className = "name"; n.textContent = acc.pseudo;
     card.appendChild(n);
 
     const r = document.createElement("div");
-    r.className = "real";
-    r.textContent = acc.realName || "";
+    r.className = "real"; r.textContent = acc.realName || "";
     card.appendChild(r);
 
     const del = document.createElement("button");
     del.className = "delete-btn";
     del.textContent = "✕";
-    del.title = "Supprimer ce compte";
     del.addEventListener("click", e => {
       e.stopPropagation();
-      if (locked) return alert("❌ Impossible de supprimer un compte en cours d'utilisation.");
-      if (confirm(`⚠️ Supprimer définitivement "${acc.pseudo}" ?`)) {
+      if (locked) return alert("❌ Compte en cours d'utilisation.");
+      if (confirm(`⚠️ Supprimer "${acc.pseudo}" ?`)) {
         accounts.splice(idx, 1);
         saveAccounts(accounts);
         if (selectedAccountIdx >= accounts.length) selectedAccountIdx = accounts.length - 1;
@@ -491,12 +639,13 @@ function enterMenuWithAccount() {
   userRealEl.textContent = currentAccount.realName;
   showScreen("menu");
   initStarfield("menuCanvas");
+  updateControlsHint();
 }
 
 enterLobbyBtn.addEventListener("click", () => {
   if (selectedAccountIdx < 0 || !accounts[selectedAccountIdx]) return;
   const acc = accounts[selectedAccountIdx];
-  if (isAccountLocked(acc.pseudo)) return alert("❌ Ce compte est déjà utilisé dans un autre onglet.");
+  if (isAccountLocked(acc.pseudo)) return alert("❌ Compte déjà utilisé ailleurs.");
   currentAccount = { ...acc };
   socket.emit("claim-account", currentAccount.pseudo);
 });
@@ -804,7 +953,7 @@ $("returnToServerBtn").addEventListener("click", () => {
 });
 
 // ==================================================================
-//  CLAVIER
+//  CLAVIER (PC)
 // ==================================================================
 const keyMap = {
   "z":"up","w":"up","arrowup":"up",
@@ -826,9 +975,10 @@ window.addEventListener("keyup", e => {
 });
 
 // ==================================================================
-//  SOURIS
+//  SOURIS (PC)
 // ==================================================================
 canvas.addEventListener("mousemove", e => {
+  if (deviceType === "mobile" || deviceType === "tablet" || deviceType === "console") return;
   const rect = canvas.getBoundingClientRect();
   const cam = getCamera();
   const me = serverState.players[myId];
@@ -838,6 +988,7 @@ canvas.addEventListener("mousemove", e => {
   myAngle = Math.atan2(wy - me.y, wx - me.x);
 });
 canvas.addEventListener("mousedown", e => {
+  if (deviceType === "mobile" || deviceType === "tablet" || deviceType === "console") return;
   if (e.button !== 0 || !gameStarted || !myId || !socket) return;
   const me = serverState.players[myId];
   if (!me || !me.alive) return;
@@ -845,7 +996,147 @@ canvas.addEventListener("mousedown", e => {
 });
 
 // ==================================================================
-//  INPUT serveur
+//  CONTRÔLES TACTILES (MOBILE / TABLETTE)
+// ==================================================================
+const touchControls = $("touchControls");
+const joystickZone = $("joystickZone");
+const joystickBase = $("joystickBase");
+const joystickKnob = $("joystickKnob");
+const shootZone = $("shootZone");
+const shootBtn = $("shootBtn");
+
+let joyActive = false, joyTouchId = null;
+let joyOriginX = 0, joyOriginY = 0;
+
+if (deviceType === "mobile" || deviceType === "tablet") {
+  touchControls.classList.remove("hidden");
+}
+
+joystickZone.addEventListener("touchstart", e => {
+  if (!gameStarted || dead) return;
+  e.preventDefault();
+  const t = e.changedTouches[0];
+  joyTouchId = t.identifier;
+  joyActive = true;
+  joyOriginX = t.clientX;
+  joyOriginY = t.clientY;
+  joystickBase.style.left = joyOriginX + "px";
+  joystickBase.style.top = joyOriginY + "px";
+  joystickBase.classList.remove("hidden");
+  joystickKnob.style.left = "50%";
+  joystickKnob.style.top = "50%";
+}, { passive: false });
+
+joystickZone.addEventListener("touchmove", e => {
+  if (!joyActive) return;
+  e.preventDefault();
+  const t = Array.from(e.changedTouches).find(x => x.identifier === joyTouchId);
+  if (!t) return;
+  const dx = t.clientX - joyOriginX;
+  const dy = t.clientY - joyOriginY;
+  const dist = Math.hypot(dx, dy);
+  const maxDist = 55;
+  const norm = dist > maxDist ? maxDist / dist : 1;
+  const nx = dx * norm;
+  const ny = dy * norm;
+  joystickKnob.style.left = `calc(50% + ${nx}px)`;
+  joystickKnob.style.top = `calc(50% + ${ny}px)`;
+
+  const deadzone = maxDist * 0.2;
+  if (dist < deadzone) {
+    keys.up = keys.down = keys.left = keys.right = false;
+    return;
+  }
+
+  const angle = Math.atan2(ny, nx);
+  keys.right = angle > -Math.PI * 0.75 && angle < Math.PI * 0.75;
+  keys.left  = angle > Math.PI * 0.75 || angle < -Math.PI * 0.75;
+  keys.down  = angle > Math.PI * 0.25 && angle < Math.PI * 0.75;
+  keys.up    = angle > -Math.PI * 0.75 && angle < -Math.PI * 0.25;
+  myAngle = angle;
+}, { passive: false });
+
+function endJoystick(e) {
+  const t = Array.from(e.changedTouches).find(x => x.identifier === joyTouchId);
+  if (!t) return;
+  joyActive = false;
+  joyTouchId = null;
+  keys.up = keys.down = keys.left = keys.right = false;
+  joystickBase.classList.add("hidden");
+}
+joystickZone.addEventListener("touchend", endJoystick);
+joystickZone.addEventListener("touchcancel", endJoystick);
+
+shootZone.addEventListener("touchstart", e => {
+  if (!gameStarted || dead || !socket) return;
+  e.preventDefault();
+  const t = e.changedTouches[0];
+  shootBtn.style.left = t.clientX + "px";
+  shootBtn.style.top = t.clientY + "px";
+  shootBtn.classList.remove("hidden");
+  const me = serverState.players[myId];
+  if (me && me.alive) socket.emit("shoot", { angle: myAngle });
+}, { passive: false });
+
+shootZone.addEventListener("touchend", () => shootBtn.classList.add("hidden"));
+shootZone.addEventListener("touchcancel", () => shootBtn.classList.add("hidden"));
+
+// ==================================================================
+//  MANETTE (CONSOLE / PC)
+// ==================================================================
+let gamepadShootCooldown = 0;
+let gamepadLastShot = 0;
+
+function pollGamepad() {
+  const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+  let gp = null;
+  for (const g of gamepads) if (g) { gp = g; break; }
+
+  if (gp && gameStarted && !dead) {
+    const now = Date.now();
+
+    // Joystick gauche → mouvement
+    const lx = gp.axes[0] || 0;
+    const ly = gp.axes[1] || 0;
+    const deadzone = 0.25;
+
+    keys.up    = ly < -deadzone;
+    keys.down  = ly > deadzone;
+    keys.left  = lx < -deadzone;
+    keys.right = lx > deadzone;
+
+    // Joystick droit → visée
+    const rx = gp.axes[2] || 0;
+    const ry = gp.axes[3] || 0;
+    if (Math.hypot(rx, ry) > deadzone) {
+      myAngle = Math.atan2(ry, rx);
+    } else if (lx !== 0 || ly !== 0) {
+      // Si on bouge mais on ne vise pas → orienter vers le déplacement
+      if (Math.hypot(lx, ly) > deadzone) myAngle = Math.atan2(ly, lx);
+    }
+
+    // Bouton tir : RT (Xbox) = button 7, R2 (PS) = button 7
+    // L2 (PS) = button 6, LT (Xbox) = button 6
+    const rtPressed = gp.buttons[7] && gp.buttons[7].pressed;
+    const ltPressed = gp.buttons[6] && gp.buttons[6].pressed;
+
+    if ((rtPressed || ltPressed) && now - gamepadLastShot > 350) {
+      const me = serverState.players[myId];
+      if (me && me.alive && socket) {
+        socket.emit("shoot", { angle: myAngle });
+        gamepadLastShot = now;
+      }
+    }
+
+    // Bouton A / X (button 0) → reload/action future
+  }
+
+  requestAnimationFrame(pollGamepad);
+}
+pollGamepad();
+
+// ==================================================================
+//  INPUT VERS LE SERVEUR
 // ==================================================================
 setInterval(() => {
   if (!gameStarted || !myId || !socket) return;
@@ -869,14 +1160,11 @@ function getCamera() {
   if (!target) return { x: 0, y: 0 };
   let cx = target.x - canvas.width / 2;
   let cy = target.y - canvas.height / 2;
-
-  // Tremblement d'écran
   if (shakeTime > 0) {
     const intensity = shakeIntensity * (shakeTime / 30);
     cx += (Math.random() - 0.5) * intensity;
     cy += (Math.random() - 0.5) * intensity;
   }
-
   return { x: cx, y: cy };
 }
 
@@ -893,7 +1181,6 @@ function drawRivers() {
   if (!md) return;
   const cam = getCamera();
   const time = Date.now() / 1000;
-
   md.rivers.forEach(r => {
     ctx.strokeStyle = "rgba(40, 30, 15, 0.8)";
     ctx.lineWidth = r.width + 24;
@@ -904,11 +1191,9 @@ function drawRivers() {
       i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
     });
     ctx.stroke();
-
     ctx.strokeStyle = "rgba(70, 90, 40, 0.5)";
     ctx.lineWidth = r.width + 12;
     ctx.stroke();
-
     ctx.strokeStyle = "rgba(15, 45, 100, 0.95)";
     ctx.lineWidth = r.width;
     ctx.beginPath();
@@ -917,11 +1202,9 @@ function drawRivers() {
       i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
     });
     ctx.stroke();
-
     ctx.strokeStyle = "rgba(30, 80, 150, 0.7)";
     ctx.lineWidth = r.width * 0.7;
     ctx.stroke();
-
     ctx.strokeStyle = `rgba(120, 200, 255, ${0.4 + Math.sin(time * 1.5) * 0.15})`;
     ctx.lineWidth = r.width * 0.45;
     ctx.setLineDash([18, 28]);
@@ -941,31 +1224,25 @@ function drawForests() {
   if (!md) return;
   const cam = getCamera();
   const time = Date.now() / 1000;
-
   md.forests.forEach(f => {
     f.forEach((t, idx) => {
       const x = t.x - cam.x, y = t.y - cam.y;
       if (x < -80 || x > canvas.width + 80 || y < -80 || y > canvas.height + 80) return;
-
       const sway = Math.sin(time * 1.2 + idx * 0.7) * 2.5;
-
       ctx.fillStyle = "rgba(0,0,0,0.45)";
       ctx.beginPath();
       ctx.ellipse(x + 6, y + t.r * 0.6, t.r * 0.95, t.r * 0.4, 0, 0, Math.PI * 2);
       ctx.fill();
-
       ctx.fillStyle = "#2a1808";
       ctx.fillRect(x - 5, y + t.r * 0.1, 10, t.r * 0.7);
       ctx.fillStyle = "#5a3a1a";
       ctx.fillRect(x - 5, y + t.r * 0.1, 4, t.r * 0.7);
-
       ctx.fillStyle = "#0a1f0a";
       ctx.beginPath(); ctx.arc(x + sway * 0.3, y + t.r * 0.1, t.r, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = "#1a3a1a";
       ctx.beginPath(); ctx.arc(x - 2 + sway * 0.5, y - t.r * 0.15, t.r * 0.85, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = "#2d5a28";
       ctx.beginPath(); ctx.arc(x - 4 + sway * 0.7, y - t.r * 0.35, t.r * 0.6, 0, Math.PI * 2); ctx.fill();
-
       ctx.fillStyle = "rgba(150, 220, 150, 0.4)";
       ctx.beginPath(); ctx.arc(x - 7 + sway * 0.8, y - t.r * 0.5, t.r * 0.28, 0, Math.PI * 2); ctx.fill();
     });
@@ -1012,18 +1289,16 @@ function drawGrid() {
   }
   ctx.strokeStyle = "#4af";
   ctx.lineWidth = 4;
-  ctx.strokeRect(-cam.x, -cam.y, 3200, 3200);
+  ctx.strokeRect(-cam.x, -cam.y, 4500, 4500);
 }
 
 function drawPlayer(p, isMe) {
   const cam = getCamera();
   const x = p.x - cam.x, y = p.y - cam.y;
-
   ctx.fillStyle = "rgba(0,0,0,0.3)";
   ctx.beginPath();
   ctx.ellipse(x, y + 6, 32, 12, 0, 0, Math.PI * 2);
   ctx.fill();
-
   if (p.shield > 0) {
     ctx.strokeStyle = `rgba(255,221,68,${0.3 + (p.shield / 100) * 0.5})`;
     ctx.lineWidth = 3;
@@ -1031,12 +1306,10 @@ function drawPlayer(p, isMe) {
     ctx.arc(x, y, 40, 0, Math.PI * 2);
     ctx.stroke();
   }
-
   ctx.save();
   ctx.translate(x, y);
   drawTankShape(ctx, p.skin, p.angle);
   ctx.restore();
-
   ctx.fillStyle = isMe ? "#4af" : "#fff";
   ctx.font = "bold 13px Segoe UI, Arial";
   ctx.textAlign = "center";
@@ -1069,16 +1342,12 @@ function updateDamageNumbers() {
 function drawDamageNumbers() {
   const cam = getCamera();
   damageNumbers.forEach(dn => {
-    const x = dn.x - cam.x;
-    const y = dn.y - cam.y;
+    const x = dn.x - cam.x, y = dn.y - cam.y;
     const alpha = Math.min(1, dn.life / 30);
-
     ctx.font = "bold 22px Segoe UI, Arial";
     ctx.textAlign = "center";
-
     ctx.fillStyle = `rgba(0,0,0,${alpha * 0.7})`;
     ctx.fillText("-" + dn.value, x + 2, y + 2);
-
     ctx.fillStyle = dn.color;
     ctx.globalAlpha = alpha;
     ctx.fillText("-" + dn.value, x, y);
@@ -1096,24 +1365,16 @@ function updateShieldBreakFx() {
 function drawShieldBreakFx() {
   const cam = getCamera();
   shieldBreakFx.forEach(fx => {
-    const x = fx.x - cam.x;
-    const y = fx.y - cam.y;
+    const x = fx.x - cam.x, y = fx.y - cam.y;
     const progress = 1 - fx.life / 50;
     const alpha = Math.min(1, fx.life / 25);
     const radius = 30 + progress * 70;
-
     ctx.strokeStyle = `rgba(255, 221, 68, ${alpha})`;
     ctx.lineWidth = 5;
-    ctx.beginPath();
-    ctx.arc(x, y, radius, 0, Math.PI * 2);
-    ctx.stroke();
-
+    ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI * 2); ctx.stroke();
     ctx.strokeStyle = `rgba(255, 200, 0, ${alpha * 0.6})`;
     ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(x, y, radius * 0.7, 0, Math.PI * 2);
-    ctx.stroke();
-
+    ctx.beginPath(); ctx.arc(x, y, radius * 0.7, 0, Math.PI * 2); ctx.stroke();
     if (fx.life > 20) {
       const textAlpha = (fx.life - 20) / 30;
       ctx.font = "bold 16px Segoe UI, Arial";
@@ -1123,17 +1384,12 @@ function drawShieldBreakFx() {
       ctx.fillStyle = `rgba(255, 221, 68, ${textAlpha})`;
       ctx.fillText("BOUCLIER DÉTRUIT !", x, y - radius - 10);
     }
-
     const shardCount = 6;
     for (let i = 0; i < shardCount; i++) {
       const a = (i / shardCount) * Math.PI * 2 + progress * 3;
       const sd = radius * 0.9;
-      const sx = x + Math.cos(a) * sd;
-      const sy = y + Math.sin(a) * sd;
       ctx.fillStyle = `rgba(255, 221, 68, ${alpha})`;
-      ctx.beginPath();
-      ctx.arc(sx, sy, 3, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.beginPath(); ctx.arc(x + Math.cos(a) * sd, y + Math.sin(a) * sd, 3, 0, Math.PI * 2); ctx.fill();
     }
   });
 }
@@ -1141,19 +1397,39 @@ function drawShieldBreakFx() {
 function drawScoreboard() {
   const el = $("scoreboard");
   const list = Object.values(serverState.players);
-  el.innerHTML = list.map(p => {
-    const c = p.alive ? (p.id === myId ? "#4af" : "#ddd") : "#f55";
-    return `<div style="color:${c}">${p.pseudo}${p.id === myId ? " (toi)" : ""}</div>`;
-  }).join("");
+  list.sort((a, b) => {
+    if (a.id === myId) return -1;
+    if (b.id === myId) return 1;
+    if (a.alive !== b.alive) return a.alive ? -1 : 1;
+    return a.pseudo.localeCompare(b.pseudo);
+  });
+  const showAll = list.length <= 10;
+  const display = showAll ? list : list.slice(0, 10);
+  const extra = list.length - display.length;
+  el.innerHTML = display.map(p => {
+    const c = p.alive ? (p.id === myId ? "#4af" : "#ddd") : "#666";
+    const skull = p.alive ? "" : " 💀";
+    const you = p.id === myId ? " (toi)" : "";
+    return `<div style="color:${c}">${esc(p.pseudo)}${you}${skull}</div>`;
+  }).join("") + (extra > 0 ? `<div style="color:#89a;font-size:11px">+ ${extra} autres…</div>` : "");
+}
+
+function drawAliveCounter() {
+  const el = $("aliveCounter");
+  if (!el) return;
+  const players = Object.values(serverState.players);
+  const alive = players.filter(p => p.alive).length;
+  const total = players.length;
+  if (total === 0) { el.textContent = ""; return; }
+  el.textContent = `${alive} / ${total} SURVIVANT${alive > 1 ? "S" : ""}`;
 }
 
 function drawMinimap() {
   const size = minimap.width;
-  const scale = size / 3200;
+  const scale = size / 4500;
   mmCtx.clearRect(0, 0, size, size);
   mmCtx.fillStyle = "rgba(10, 20, 40, 0.9)";
   mmCtx.fillRect(0, 0, size, size);
-
   if (serverState.mapData) {
     mmCtx.fillStyle = "rgba(150, 150, 180, 0.4)";
     serverState.mapData.walls.forEach(w => {
@@ -1169,7 +1445,6 @@ function drawMinimap() {
       mmCtx.stroke();
     });
   }
-
   const me = serverState.players[myId];
   if (me && me.alive) {
     mmCtx.fillStyle = "#4af";
@@ -1191,18 +1466,15 @@ function loop() {
     drawGrid();
     drawWalls();
     drawForests();
-
     Object.values(serverState.players).forEach(p => {
       if (p.alive) drawPlayer(p, p.id === myId);
     });
-
     drawBullets();
     drawShieldBreakFx();
     drawDamageNumbers();
-
     drawScoreboard();
+    drawAliveCounter();
     drawMinimap();
-
     updateDamageNumbers();
     updateShieldBreakFx();
     if (shakeTime > 0) shakeTime--;
