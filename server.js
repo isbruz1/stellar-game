@@ -1,739 +1,791 @@
+/* ==================================================================
+   STELLAR GAME — Serveur
+   Multijoueur temps réel avec :
+   - Multi-serveurs (codes à 5 caractères)
+   - Jusqu'à 32 joueurs par serveur
+   - Système de comptes (lock multi-onglets)
+   - Carte générée avec murs, rivières, forêts
+   - Spawn sécurisé (pas dans les murs)
+   - HP + Bouclier
+   - Détection du dernier survivant (victoire)
+   - Mode spectateur
+   - Événements : hit, shield-broken, screen-shake
+   ================================================================== */
+
 const express = require("express");
 const http = require("http");
 const path = require("path");
-const crypto = require("crypto");
 const { Server } = require("socket.io");
 
 const app = express();
 const server = http.createServer(app);
-
 const io = new Server(server, {
-    cors: {
-        origin: true,
-        methods: ["GET", "POST"]
-    },
-    transports: ["websocket", "polling"],
-    pingInterval: 10000,
-    pingTimeout: 20000
+  cors: { origin: "*" },
+  pingTimeout: 30000,
+  pingInterval: 10000
 });
-
-const PORT = Number(process.env.PORT) || 10000;
-const HOST = "0.0.0.0";
 
 app.use(express.static(path.join(__dirname, "public")));
 
-app.get("/health", (req, res) => {
-    res.json({
-        ok: true,
-        game: "Stellar Game",
-        players: io.engine.clientsCount,
-        uptime: process.uptime()
+// ==================================================================
+//  CONSTANTES
+// ==================================================================
+const MAP_W = 4500;
+const MAP_H = 4500;
+const PLAYER_RADIUS = 24;
+const PLAYER_SPEED = 3.4;
+const BULLET_SPEED = 9;
+const BULLET_LIFE = 150;
+const BULLET_DAMAGE = 25;
+const SHOOT_COOLDOWN = 350;
+const MAX_HP = 100;
+const MAX_SHIELD = 100;
+const MAX_PLAYERS = 32;
+
+// ==================================================================
+//  COMPTES ACTIFS (lock multi-onglets)
+// ==================================================================
+const activeAccounts = {};
+
+function broadcastLockedAccounts() {
+  io.emit(
+    "locked-accounts",
+    Object.values(activeAccounts).map(a => a.pseudoOriginal)
+  );
+}
+
+// ==================================================================
+//  ROOMS
+// ==================================================================
+const rooms = {};
+let tickCounter = 0;
+
+function genRoomId() {
+  const c = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let s = "";
+  for (let i = 0; i < 5; i++) {
+    s += c[Math.floor(Math.random() * c.length)];
+  }
+  return s;
+}
+
+// ---------- Génération de map ----------
+function genWall() {
+  const w = 120 + Math.random() * 300;
+  const h = 40 + Math.random() * 120;
+  return {
+    x: 300 + Math.random() * (MAP_W - 800),
+    y: 300 + Math.random() * (MAP_H - 800),
+    w,
+    h
+  };
+}
+
+function genRiver() {
+  const points = [];
+  let x = Math.random() * MAP_W;
+  let y = 0;
+  const segments = 5 + Math.floor(Math.random() * 3);
+  for (let i = 0; i <= segments; i++) {
+    points.push({ x, y });
+    x += (Math.random() - 0.5) * 400;
+    y += MAP_H / segments;
+    x = Math.max(200, Math.min(MAP_W - 200, x));
+  }
+  return { points, width: 90 + Math.random() * 50 };
+}
+
+function genForest() {
+  const cx = 400 + Math.random() * (MAP_W - 800);
+  const cy = 400 + Math.random() * (MAP_H - 800);
+  const trees = [];
+  const count = 15 + Math.floor(Math.random() * 15);
+  for (let i = 0; i < count; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const d = Math.random() * 220;
+    trees.push({
+      x: cx + Math.cos(a) * d,
+      y: cy + Math.sin(a) * d,
+      r: 22 + Math.random() * 12
     });
-});
-
-app.get("*", (req, res) => {
-    res.sendFile(path.join(__dirname, "public", "index.html"));
-});
-
-// --------------------------------------------------
-// GAME CONFIG
-// --------------------------------------------------
-
-const WORLD = {
-    width: 3600,
-    height: 2400
-};
-
-const MAX_PLAYERS_PER_SERVER = 16;
-
-const TICK_RATE = 30;
-const TICK_MS = 1000 / TICK_RATE;
-
-const PLAYER_SPEED = 260;
-const PLAYER_RADIUS = 20;
-
-const BULLET_SPEED = 850;
-const BULLET_RADIUS = 5;
-const BULLET_LIFETIME = 1.5;
-
-const FIRE_COOLDOWN = 0.18;
-
-// --------------------------------------------------
-// DATA
-// --------------------------------------------------
-
-const rooms = new Map();
-
-const COLORS = [
-    "#38bdf8",
-    "#a78bfa",
-    "#34d399",
-    "#fbbf24",
-    "#fb7185",
-    "#f97316",
-    "#22d3ee",
-    "#e879f9"
-];
-
-function createId(length = 6) {
-    return crypto
-        .randomBytes(length)
-        .toString("base64")
-        .replace(/[^A-Z0-9]/gi, "")
-        .slice(0, length)
-        .toUpperCase();
+  }
+  return trees;
 }
 
-function random(min, max) {
-    return Math.random() * (max - min) + min;
+function generateMap() {
+  const walls = [];
+  for (let i = 0; i < 28; i++) walls.push(genWall());
+
+  const rivers = [];
+  for (let i = 0; i < 3; i++) rivers.push(genRiver());
+
+  const forests = [];
+  for (let i = 0; i < 9; i++) forests.push(genForest());
+
+  return { walls, rivers, forests };
 }
 
-function clamp(value, min, max) {
-    return Math.max(min, Math.min(max, value));
+// ---------- Création de room ----------
+function createRoom(name, hostId) {
+  let id;
+  do {
+    id = genRoomId();
+  } while (rooms[id]);
+
+  const r = {
+    id,
+    name: name || `Serveur ${id}`,
+    hostId,
+    players: {},
+    bullets: [],
+    bulletSeq: 0,
+    gameStarted: false,
+    mapData: null,
+    maxPlayers: MAX_PLAYERS,
+    victoryDeclared: false
+  };
+  rooms[id] = r;
+  return r;
 }
 
-function distance(a, b) {
-    return Math.hypot(a.x - b.x, a.y - b.y);
-}
-
-function normalize(x, y) {
-    const length = Math.hypot(x, y);
-
-    if (length <= 0.0001) {
-        return { x: 0, y: 0 };
+// ==================================================================
+//  COLLISIONS
+// ==================================================================
+function isInsideWall(walls, x, y, r) {
+  for (const w of walls) {
+    if (
+      x + r > w.x &&
+      x - r < w.x + w.w &&
+      y + r > w.y &&
+      y - r < w.y + w.h
+    ) {
+      return true;
     }
+  }
+  return false;
+}
 
-    return {
-        x: x / length,
-        y: y / length
+function isInsideTree(forests, x, y, r) {
+  for (const f of forests) {
+    for (const t of f) {
+      if (Math.hypot(t.x - x, t.y - y) < t.r + r * 0.6) return true;
+    }
+  }
+  return false;
+}
+
+// ---------- Spawn sécurisé ----------
+function findSafeSpawn(room, preferX, preferY) {
+  const md = room.mapData;
+  const margin = PLAYER_RADIUS + 40;
+
+  const tryPos = (x, y) => {
+    if (x < margin || x > MAP_W - margin) return false;
+    if (y < margin || y > MAP_H - margin) return false;
+    if (isInsideWall(md.walls, x, y, PLAYER_RADIUS + 15)) return false;
+    if (isInsideTree(md.forests, x, y, PLAYER_RADIUS + 15)) return false;
+    return true;
+  };
+
+  if (tryPos(preferX, preferY)) return { x: preferX, y: preferY };
+
+  // Spirale de secours
+  for (let ring = 1; ring <= 40; ring++) {
+    const dist = ring * 60;
+    const count = 8 + ring * 2;
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2;
+      const x = preferX + Math.cos(a) * dist;
+      const y = preferY + Math.sin(a) * dist;
+      if (tryPos(x, y)) return { x, y };
+    }
+  }
+  return { x: MAP_W / 2, y: MAP_H / 2 };
+}
+
+// ==================================================================
+//  HELPERS D'ÉTAT
+// ==================================================================
+function publicPlayers(room) {
+  const out = {};
+  for (const id in room.players) {
+    const p = room.players[id];
+    out[id] = {
+      id,
+      pseudo: p.pseudo,
+      realName: p.realName,
+      skin: p.skin,
+      ready: p.ready
     };
+  }
+  return out;
 }
 
-// --------------------------------------------------
-// MAP
-// --------------------------------------------------
-
-function createMap() {
-    const walls = [];
-    const forests = [];
-    const rivers = [];
-
-    // Border walls
-    walls.push(
-        { x: 0, y: 0, w: WORLD.width, h: 40 },
-        { x: 0, y: WORLD.height - 40, w: WORLD.width, h: 40 },
-        { x: 0, y: 0, w: 40, h: WORLD.height },
-        { x: WORLD.width - 40, y: 0, w: 40, h: WORLD.height }
-    );
-
-    // Buildings / obstacles
-    const buildings = [
-        [600, 420, 300, 190],
-        [1280, 300, 360, 180],
-        [2180, 420, 360, 200],
-        [2850, 720, 330, 220],
-
-        [380, 1350, 350, 190],
-        [1120, 1500, 330, 220],
-        [2050, 1320, 360, 190],
-        [2800, 1500, 400, 230],
-
-        [1500, 820, 220, 350]
-    ];
-
-    for (const [x, y, w, h] of buildings) {
-        walls.push({ x, y, w, h });
-    }
-
-    // Forest zones
-    forests.push(
-        { x: 120, y: 280, w: 320, h: 300 },
-        { x: 3150, y: 250, w: 300, h: 350 },
-        { x: 760, y: 1820, w: 360, h: 330 },
-        { x: 2350, y: 1880, w: 400, h: 300 }
-    );
-
-    // Rivers
-    rivers.push({
-        x: 1750,
-        y: 0,
-        w: 150,
-        h: WORLD.height
-    });
-
-    return {
-        width: WORLD.width,
-        height: WORLD.height,
-        walls,
-        forests,
-        rivers
+function buildState(room) {
+  const p = {};
+  for (const id in room.players) {
+    const pl = room.players[id];
+    p[id] = {
+      id,
+      x: pl.x,
+      y: pl.y,
+      angle: pl.angle,
+      skin: pl.skin,
+      hp: pl.hp,
+      shield: pl.shield,
+      alive: pl.alive,
+      pseudo: pl.pseudo,
+      realName: pl.realName
     };
+  }
+  return {
+    players: p,
+    bullets: room.bullets.map(b => ({ id: b.id, x: b.x, y: b.y })),
+    mapData: room.mapData
+  };
 }
 
-// --------------------------------------------------
-// ROOM
-// --------------------------------------------------
-
-function createRoom(name, ownerId) {
-    const room = {
-        id: createId(6),
-        name: name || "Stellar Server",
-        ownerId,
-        players: new Map(),
-        bullets: [],
-        createdAt: Date.now(),
-        map: createMap()
-    };
-
-    rooms.set(room.id, room);
-
-    return room;
+function broadcastLobby(room) {
+  io.to(room.id).emit("lobby-update", {
+    players: publicPlayers(room),
+    hostId: room.hostId,
+    gameStarted: room.gameStarted,
+    roomId: room.id,
+    roomName: room.name
+  });
+  io.emit("room-list-update", roomList());
 }
 
-function getRoomPlayers(room) {
-    return [...room.players.values()].map(player => ({
-        id: player.id,
-        name: player.name,
-        x: player.x,
-        y: player.y,
-        angle: player.angle,
-        color: player.color,
-        health: player.health,
-        maxHealth: player.maxHealth,
-        kills: player.kills,
-        deaths: player.deaths,
-        alive: player.alive,
-        ready: player.ready
-    }));
+function roomList() {
+  return Object.values(rooms).map(r => ({
+    id: r.id,
+    name: r.name,
+    host: r.players[r.hostId]?.pseudo || "?",
+    count: Object.keys(r.players).length,
+    max: r.maxPlayers,
+    started: r.gameStarted
+  }));
 }
 
-function publicRoom(room) {
-    return {
-        id: room.id,
-        name: room.name,
-        players: room.players.size,
-        maxPlayers: MAX_PLAYERS_PER_SERVER,
-        ownerId: room.ownerId
-    };
+// ---------- Reset pour nouvelle partie ----------
+function resetForGame(room) {
+  room.bullets = [];
+  room.mapData = generateMap();
+  room.victoryDeclared = false;
+
+  const ids = Object.keys(room.players);
+  const count = ids.length;
+  const spawnRadius = Math.min(1400, 300 + count * 30);
+
+  ids.forEach((id, i) => {
+    const p = room.players[id];
+    const a = (i / count) * Math.PI * 2;
+    const preferX = MAP_W / 2 + Math.cos(a) * spawnRadius;
+    const preferY = MAP_H / 2 + Math.sin(a) * spawnRadius;
+
+    const safe = findSafeSpawn(room, preferX, preferY);
+    p.x = safe.x;
+    p.y = safe.y;
+    p.angle = a + Math.PI;
+
+    p.hp = MAX_HP;
+    p.shield = MAX_SHIELD;
+    p.alive = true;
+    p.lastShot = 0;
+    p.spectating = null;
+    p.spectators = 0;
+  });
 }
 
-function getRoomList() {
-    return [...rooms.values()]
-        .sort((a, b) => b.createdAt - a.createdAt)
-        .map(publicRoom);
-}
-
-// --------------------------------------------------
-// SPAWN
-// --------------------------------------------------
-
-function isInsideWall(x, y, radius, room) {
-    for (const wall of room.map.walls) {
-        if (
-            x + radius > wall.x &&
-            x - radius < wall.x + wall.w &&
-            y + radius > wall.y &&
-            y - radius < wall.y + wall.h
-        ) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-function isInsideRiver(x, y, room) {
-    for (const river of room.map.rivers) {
-        if (
-            x > river.x &&
-            x < river.x + river.w &&
-            y > river.y &&
-            y < river.y + river.h
-        ) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-function findSpawn(room) {
-    for (let i = 0; i < 100; i++) {
-        const point = {
-            x: random(100, WORLD.width - 100),
-            y: random(100, WORLD.height - 100)
-        };
-
-        if (isInsideWall(point.x, point.y, 60, room)) {
-            continue;
-        }
-
-        if (isInsideRiver(point.x, point.y, room)) {
-            continue;
-        }
-
-        let valid = true;
-
-        for (const player of room.players.values()) {
-            if (distance(point, player) < 180) {
-                valid = false;
-                break;
-            }
-        }
-
-        if (valid) {
-            return point;
-        }
-    }
-
-    return {
-        x: WORLD.width / 2,
-        y: WORLD.height / 2
-    };
-}
-
-// --------------------------------------------------
-// PLAYER
-// --------------------------------------------------
-
-function createPlayer(socket, name, room) {
-    const spawn = findSpawn(room);
-
-    return {
-        id: socket.id,
-        name: String(name || "Player").trim().slice(0, 16) || "Player",
-
-        x: spawn.x,
-        y: spawn.y,
-
-        angle: 0,
-
-        vx: 0,
-        vy: 0,
-
-        color: COLORS[Math.floor(Math.random() * COLORS.length)],
-
-        health: 100,
-        maxHealth: 100,
-
-        kills: 0,
-        deaths: 0,
-
-        alive: true,
-        ready: false,
-
-        input: {
-            x: 0,
-            y: 0,
-            shooting: false,
-            angle: 0
-        },
-
-        lastShot: 0,
-        respawnAt: 0
-    };
-}
-
-// --------------------------------------------------
-// COLLISION
-// --------------------------------------------------
-
-function movePlayer(player, room, dx, dy) {
-    let newX = player.x + dx;
-    let newY = player.y + dy;
-
-    newX = clamp(
-        newX,
-        PLAYER_RADIUS + 45,
-        WORLD.width - PLAYER_RADIUS - 45
-    );
-
-    newY = clamp(
-        newY,
-        PLAYER_RADIUS + 45,
-        WORLD.height - PLAYER_RADIUS - 45
-    );
-
-    if (!isInsideWall(newX, newY, PLAYER_RADIUS, room)) {
-        player.x = newX;
-    }
-
-    if (!isInsideWall(player.x, newY, PLAYER_RADIUS, room)) {
-        player.y = newY;
-    }
-}
-
-// --------------------------------------------------
-// SHOOT
-// --------------------------------------------------
-
-function createBullet(player, room) {
-    const now = Date.now();
-
-    if (now - player.lastShot < FIRE_COOLDOWN * 1000) {
-        return;
-    }
-
-    if (!player.alive) {
-        return;
-    }
-
-    player.lastShot = now;
-
-    const direction = normalize(
-        Math.cos(player.input.angle),
-        Math.sin(player.input.angle)
-    );
-
-    room.bullets.push({
-        id: createId(8),
-        ownerId: player.id,
-
-        x: player.x + direction.x * 28,
-        y: player.y + direction.y * 28,
-
-        vx: direction.x * BULLET_SPEED,
-        vy: direction.y * BULLET_SPEED,
-
-        life: BULLET_LIFETIME
-    });
-}
-
-// --------------------------------------------------
-// BULLETS
-// --------------------------------------------------
-
-function updateBullets(room, dt) {
-    for (let i = room.bullets.length - 1; i >= 0; i--) {
-        const bullet = room.bullets[i];
-
-        bullet.x += bullet.vx * dt;
-        bullet.y += bullet.vy * dt;
-        bullet.life -= dt;
-
-        if (
-            bullet.life <= 0 ||
-            bullet.x < 0 ||
-            bullet.y < 0 ||
-            bullet.x > WORLD.width ||
-            bullet.y > WORLD.height ||
-            isInsideWall(bullet.x, bullet.y, BULLET_RADIUS, room)
-        ) {
-            room.bullets.splice(i, 1);
-            continue;
-        }
-
-        let hit = false;
-
-        for (const player of room.players.values()) {
-            if (!player.alive) continue;
-            if (player.id === bullet.ownerId) continue;
-
-            const d = Math.hypot(
-                player.x - bullet.x,
-                player.y - bullet.y
-            );
-
-            if (d < PLAYER_RADIUS + BULLET_RADIUS) {
-                player.health -= 34;
-                hit = true;
-
-                if (player.health <= 0) {
-                    player.health = 0;
-                    player.alive = false;
-                    player.deaths++;
-                    player.respawnAt = Date.now() + 2500;
-
-                    const killer = room.players.get(bullet.ownerId);
-
-                    if (killer) {
-                        killer.kills++;
-                    }
-
-                    io.to(room.id).emit("playerDied", {
-                        victim: player.name,
-                        killer: killer ? killer.name : "Unknown"
-                    });
-                }
-
-                break;
-            }
-        }
-
-        if (hit) {
-            room.bullets.splice(i, 1);
-        }
-    }
-}
-
-// --------------------------------------------------
-// GAME LOOP
-// --------------------------------------------------
-
-function updateRoom(room, dt) {
-    for (const player of room.players.values()) {
-        if (!player.alive) {
-            if (Date.now() >= player.respawnAt) {
-                const spawn = findSpawn(room);
-
-                player.x = spawn.x;
-                player.y = spawn.y;
-                player.health = player.maxHealth;
-                player.alive = true;
-            }
-
-            continue;
-        }
-
-        const input = player.input;
-
-        const normalized = normalize(input.x, input.y);
-
-        let speed = PLAYER_SPEED;
-
-        // River slows players
-        if (isInsideRiver(player.x, player.y, room)) {
-            speed *= 0.55;
-        }
-
-        movePlayer(
-            player,
-            room,
-            normalized.x * speed * dt,
-            normalized.y * speed * dt
-        );
-
-        player.angle = input.angle;
-
-        if (input.shooting) {
-            createBullet(player, room);
-        }
-    }
-
-    updateBullets(room, dt);
-}
-
-// --------------------------------------------------
-// SOCKET.IO
-// --------------------------------------------------
-
+// ==================================================================
+//  SOCKET
+// ==================================================================
 io.on("connection", socket => {
-    console.log("Connected:", socket.id);
+  let currentRoom = null;
 
-    socket.emit("connected", {
-        id: socket.id,
-        rooms: getRoomList()
-    });
+  // Envoi initial
+  socket.emit("room-list-update", roomList());
+  socket.emit(
+    "locked-accounts",
+    Object.values(activeAccounts).map(a => a.pseudoOriginal)
+  );
 
-    socket.on("getRooms", () => {
-        socket.emit("roomList", getRoomList());
-    });
+  // ---------- LISTER LES ROOMS ----------
+  socket.on("list-rooms", () => {
+    socket.emit("room-list-update", roomList());
+  });
 
-    socket.on("createRoom", data => {
-        const name =
-            data && typeof data.name === "string"
-                ? data.name
-                : "Stellar Server";
+  // ---------- COMPTES (lock multi-onglets) ----------
+  socket.on("claim-account", pseudo => {
+    const key = String(pseudo || "").toLowerCase();
+    if (!key) {
+      socket.emit("claim-result", { ok: false, reason: "pseudo invalide" });
+      return;
+    }
+    const existing = activeAccounts[key];
+    if (existing && existing.socketId !== socket.id) {
+      socket.emit("claim-result", {
+        ok: false,
+        reason: "Ce compte est déjà utilisé ailleurs."
+      });
+      return;
+    }
+    activeAccounts[key] = {
+      socketId: socket.id,
+      pseudoOriginal: pseudo
+    };
+    socket.emit("claim-result", { ok: true });
+    broadcastLockedAccounts();
+  });
 
-        const playerName =
-            data && typeof data.playerName === "string"
-                ? data.playerName
-                : "Player";
+  socket.on("release-account", pseudo => {
+    const key = String(pseudo || "").toLowerCase();
+    if (
+      activeAccounts[key] &&
+      activeAccounts[key].socketId === socket.id
+    ) {
+      delete activeAccounts[key];
+      broadcastLockedAccounts();
+    }
+  });
 
-        const room = createRoom(name, socket.id);
+  // ---------- CRÉER UNE ROOM ----------
+  socket.on("create-room", data => {
+    const room = createRoom(data.name, socket.id);
+    currentRoom = room.id;
+    socket.join(room.id);
+    socket.emit("room-created", { id: room.id, name: room.name });
+    io.emit("room-list-update", roomList());
+  });
 
-        joinRoom(socket, room, playerName);
-    });
-
-    socket.on("joinRoom", data => {
-        if (!data || !data.roomId) {
-            socket.emit("errorMessage", "Serveur introuvable.");
-            return;
-        }
-
-        const room = rooms.get(String(data.roomId).toUpperCase());
-
-        if (!room) {
-            socket.emit("errorMessage", "Ce serveur n'existe plus.");
-            return;
-        }
-
-        if (room.players.size >= MAX_PLAYERS_PER_SERVER) {
-            socket.emit("errorMessage", "Ce serveur est complet.");
-            return;
-        }
-
-        const playerName =
-            typeof data.playerName === "string"
-                ? data.playerName
-                : "Player";
-
-        joinRoom(socket, room, playerName);
-    });
-
-    socket.on("leaveRoom", () => {
-        leaveCurrentRoom(socket);
-    });
-
-    socket.on("ready", value => {
-        const room = getPlayerRoom(socket.id);
-
-        if (!room) return;
-
-        const player = room.players.get(socket.id);
-
-        if (!player) return;
-
-        player.ready = Boolean(value);
-
-        io.to(room.id).emit("roomState", {
-            room: publicRoom(room),
-            players: getRoomPlayers(room)
-        });
-    });
-
-    socket.on("startGame", () => {
-        const room = getPlayerRoom(socket.id);
-
-        if (!room) return;
-
-        if (room.ownerId !== socket.id) {
-            socket.emit("errorMessage", "Seul l'hôte peut lancer la partie.");
-            return;
-        }
-
-        io.to(room.id).emit("gameStarted", {
-            map: room.map
-        });
-    });
-
-    socket.on("input", input => {
-        const room = getPlayerRoom(socket.id);
-
-        if (!room) return;
-
-        const player = room.players.get(socket.id);
-
-        if (!player) return;
-
-        const x = Number(input?.x) || 0;
-        const y = Number(input?.y) || 0;
-        const angle = Number(input?.angle) || 0;
-
-        player.input.x = clamp(x, -1, 1);
-        player.input.y = clamp(y, -1, 1);
-        player.input.angle = angle;
-        player.input.shooting = Boolean(input?.shooting);
-    });
-
-    socket.on("disconnect", () => {
-        console.log("Disconnected:", socket.id);
-
-        leaveCurrentRoom(socket);
-    });
-});
-
-// --------------------------------------------------
-// JOIN / LEAVE
-// --------------------------------------------------
-
-function getPlayerRoom(socketId) {
-    for (const room of rooms.values()) {
-        if (room.players.has(socketId)) {
-            return room;
-        }
+  // ---------- REJOINDRE UNE ROOM ----------
+  socket.on("join-room", data => {
+    const room = rooms[data.id];
+    if (!room) {
+      socket.emit("join-error", "Serveur introuvable.");
+      return;
+    }
+    if (Object.keys(room.players).length >= room.maxPlayers) {
+      socket.emit("join-error", "Serveur plein.");
+      return;
+    }
+    if (room.gameStarted) {
+      socket.emit("join-error", "Partie déjà en cours.");
+      return;
     }
 
-    return null;
-}
-
-function joinRoom(socket, room, playerName) {
-    const oldRoom = getPlayerRoom(socket.id);
-
-    if (oldRoom) {
-        leaveCurrentRoom(socket);
-    }
-
-    const player = createPlayer(socket, playerName, room);
-
-    room.players.set(socket.id, player);
-
+    currentRoom = room.id;
     socket.join(room.id);
 
-    socket.emit("joinedRoom", {
-        room: publicRoom(room),
-        player: {
-            id: player.id,
-            name: player.name,
-            color: player.color
-        },
-        map: room.map
+    room.players[socket.id] = {
+      id: socket.id,
+      pseudo: String(data.pseudo || "Joueur").slice(0, 16),
+      realName: String(data.realName || "").slice(0, 32),
+      skin: Number(data.skin) || 0,
+      ready: false,
+      x: MAP_W / 2,
+      y: MAP_H / 2,
+      angle: 0,
+      hp: MAX_HP,
+      shield: MAX_SHIELD,
+      alive: true,
+      lastShot: 0,
+      spectators: 0,
+      spectating: null
+    };
+
+    socket.emit("room-joined", { id: room.id, name: room.name });
+    broadcastLobby(room);
+  });
+
+  // ---------- QUITTER LA ROOM ----------
+  socket.on("leave-room", () => {
+    if (currentRoom) handleLeave(currentRoom, socket.id);
+    socket.emit("left-room");
+    currentRoom = null;
+  });
+
+  // ---------- MISE À JOUR DU PROFIL ----------
+  socket.on("update-pseudo", pseudo => {
+    const room = rooms[currentRoom];
+    if (room && room.players[socket.id]) {
+      room.players[socket.id].pseudo = String(pseudo).slice(0, 16);
+    }
+    if (room) broadcastLobby(room);
+  });
+
+  socket.on("update-realname", name => {
+    const room = rooms[currentRoom];
+    if (room && room.players[socket.id]) {
+      room.players[socket.id].realName = String(name).slice(0, 32);
+    }
+    if (room) broadcastLobby(room);
+  });
+
+  socket.on("update-skin", skin => {
+    const room = rooms[currentRoom];
+    if (room && room.players[socket.id]) {
+      room.players[socket.id].skin = Number(skin) || 0;
+    }
+    if (room) broadcastLobby(room);
+  });
+
+  // ---------- READY / UNREADY ----------
+  socket.on("toggle-ready", () => {
+    const room = rooms[currentRoom];
+    if (!room) return;
+    const p = room.players[socket.id];
+    if (p && socket.id !== room.hostId) {
+      p.ready = !p.ready;
+      broadcastLobby(room);
+    }
+  });
+
+  // ---------- DÉMARRER LA PARTIE ----------
+  socket.on("start-game", () => {
+    const room = rooms[currentRoom];
+    if (!room || socket.id !== room.hostId) return;
+
+    const guests = Object.values(room.players).filter(
+      p => p.id !== room.hostId
+    );
+    if (guests.length > 0 && !guests.every(p => p.ready)) return;
+
+    resetForGame(room);
+    room.gameStarted = true;
+    io.to(room.id).emit("game-started");
+    io.to(room.id).emit("state", buildState(room));
+  });
+
+  // ---------- QUITTER LA PARTIE (retour au salon) ----------
+  socket.on("leave-game", () => {
+    const room = rooms[currentRoom];
+    if (!room) return;
+    const p = room.players[socket.id];
+    if (p) {
+      p.ready = false;
+      p.hp = MAX_HP;
+      p.shield = MAX_SHIELD;
+      p.alive = true;
+      p.spectating = null;
+
+      for (const id in room.players) {
+        if (room.players[id].spectating === socket.id) {
+          room.players[id].spectating = null;
+        }
+      }
+    }
+    // Si l'hôte part → arrêt de la partie
+    if (socket.id === room.hostId) {
+      room.gameStarted = false;
+      room.bullets = [];
+      io.to(room.id).emit("game-ended");
+    }
+    broadcastLobby(room);
+  });
+
+  // ---------- SPECTATEUR ----------
+  socket.on("spectate", targetId => {
+    const room = rooms[currentRoom];
+    if (!room) return;
+    const p = room.players[socket.id];
+    const target = room.players[targetId];
+    if (!p || !target) return;
+
+    if (p.spectating) {
+      const old = room.players[p.spectating];
+      if (old) old.spectators = Math.max(0, (old.spectators || 0) - 1);
+    }
+    p.spectating = targetId;
+    target.spectators = (target.spectators || 0) + 1;
+  });
+
+  socket.on("stop-spectate", () => {
+    const room = rooms[currentRoom];
+    if (!room) return;
+    const p = room.players[socket.id];
+    if (!p || !p.spectating) return;
+    const old = room.players[p.spectating];
+    if (old) old.spectators = Math.max(0, (old.spectators || 0) - 1);
+    p.spectating = null;
+  });
+
+  // ---------- INPUT (mouvement) ----------
+  socket.on("input", data => {
+    const room = rooms[currentRoom];
+    if (!room) return;
+    const p = room.players[socket.id];
+    if (!p || !room.gameStarted || !p.alive) return;
+
+    const k = data.keys || {};
+    let dx = 0,
+      dy = 0;
+    if (k.up) dy -= 1;
+    if (k.down) dy += 1;
+    if (k.left) dx -= 1;
+    if (k.right) dx += 1;
+    const len = Math.hypot(dx, dy);
+
+    let nx = p.x,
+      ny = p.y;
+    if (len > 0) {
+      nx += (dx / len) * PLAYER_SPEED;
+      ny += (dy / len) * PLAYER_SPEED;
+    }
+    nx = Math.max(PLAYER_RADIUS, Math.min(MAP_W - PLAYER_RADIUS, nx));
+    ny = Math.max(PLAYER_RADIUS, Math.min(MAP_H - PLAYER_RADIUS, ny));
+
+    const md = room.mapData;
+    if (md) {
+      // Si coincé dans un mur, on peut bouger librement pour sortir
+      const currentlyStuck =
+        isInsideWall(md.walls, p.x, p.y, PLAYER_RADIUS) ||
+        isInsideTree(md.forests, p.x, p.y, PLAYER_RADIUS);
+
+      if (currentlyStuck) {
+        p.x = nx;
+        p.y = ny;
+      } else {
+        if (!isInsideWall(md.walls, nx, p.y, PLAYER_RADIUS)) p.x = nx;
+        if (
+          !isInsideWall(md.walls, p.x, ny, PLAYER_RADIUS) &&
+          !isInsideTree(md.forests, p.x, ny, PLAYER_RADIUS)
+        ) {
+          p.y = ny;
+        }
+      }
+    } else {
+      p.x = nx;
+      p.y = ny;
+    }
+
+    if (typeof data.angle === "number") p.angle = data.angle;
+  });
+
+  // ---------- TIR ----------
+  socket.on("shoot", data => {
+    const room = rooms[currentRoom];
+    if (!room) return;
+    const p = room.players[socket.id];
+    if (!p || !room.gameStarted || !p.alive) return;
+
+    const now = Date.now();
+    if (now - p.lastShot < SHOOT_COOLDOWN) return;
+    p.lastShot = now;
+
+    if (typeof data.angle === "number") p.angle = data.angle;
+
+    // Offset adaptatif si coincé
+    const md = room.mapData;
+    let offset = 34;
+    if (md) {
+      const stuck =
+        isInsideWall(md.walls, p.x, p.y, PLAYER_RADIUS) ||
+        isInsideTree(md.forests, p.x, p.y, PLAYER_RADIUS);
+      if (stuck) offset = 70;
+    }
+
+    room.bullets.push({
+      id: ++room.bulletSeq,
+      x: p.x + Math.cos(p.angle) * offset,
+      y: p.y + Math.sin(p.angle) * offset,
+      vx: Math.cos(p.angle) * BULLET_SPEED,
+      vy: Math.sin(p.angle) * BULLET_SPEED,
+      owner: socket.id,
+      life: BULLET_LIFE,
+      ignoreWalls: 3
     });
+  });
 
-    broadcastRoom(room);
-}
+  // ---------- DÉCONNEXION ----------
+  socket.on("disconnect", () => {
+    for (const key in activeAccounts) {
+      if (activeAccounts[key].socketId === socket.id) {
+        delete activeAccounts[key];
+      }
+    }
+    broadcastLockedAccounts();
+    if (currentRoom) handleLeave(currentRoom, socket.id);
+  });
 
-function leaveCurrentRoom(socket) {
-    const room = getPlayerRoom(socket.id);
-
+  // ---------- FONCTION DE SORTIE DE ROOM ----------
+  function handleLeave(rid, sid) {
+    const room = rooms[rid];
     if (!room) return;
 
-    room.players.delete(socket.id);
+    const p = room.players[sid];
+    if (p && p.spectating) {
+      const old = room.players[p.spectating];
+      if (old) old.spectators = Math.max(0, (old.spectators || 0) - 1);
+    }
+    delete room.players[sid];
 
-    socket.leave(room.id);
-
-    if (room.ownerId === socket.id) {
-        const nextPlayer = room.players.values().next().value;
-
-        if (nextPlayer) {
-            room.ownerId = nextPlayer.id;
+    if (Object.keys(room.players).length === 0) {
+      delete rooms[rid];
+    } else {
+      // Passation d'hôte
+      if (sid === room.hostId) {
+        room.hostId = Object.keys(room.players)[0];
+        if (room.gameStarted) {
+          room.gameStarted = false;
+          room.bullets = [];
+          io.to(room.id).emit("game-ended");
         }
+      }
+      broadcastLobby(room);
+    }
+    io.emit("room-list-update", roomList());
+  }
+});
+
+// ==================================================================
+//  TICK — boucle de jeu (60 Hz, envoi à 30 Hz)
+// ==================================================================
+function tick() {
+  tickCounter++;
+
+  for (const rid in rooms) {
+    const room = rooms[rid];
+    if (!room.gameStarted) continue;
+
+    // ---------- BALLES ----------
+    for (let i = room.bullets.length - 1; i >= 0; i--) {
+      const b = room.bullets[i];
+      b.x += b.vx;
+      b.y += b.vy;
+      b.life--;
+
+      if (b.ignoreWalls && b.ignoreWalls > 0) b.ignoreWalls--;
+
+      let dead = false;
+
+      if (b.life <= 0 || b.x < 0 || b.x > MAP_W || b.y < 0 || b.y > MAP_H) {
+        dead = true;
+      }
+
+      // Collision mur (après la grace period)
+      if (
+        !dead &&
+        !b.ignoreWalls &&
+        room.mapData &&
+        isInsideWall(room.mapData.walls, b.x, b.y, 4)
+      ) {
+        dead = true;
+      }
+
+      if (dead) {
+        room.bullets.splice(i, 1);
+        continue;
+      }
+
+      // Collision joueur
+      let hit = false;
+      for (const id in room.players) {
+        if (id === b.owner) continue;
+        const p = room.players[id];
+        if (!p.alive) continue;
+
+        if (Math.hypot(p.x - b.x, p.y - b.y) < PLAYER_RADIUS) {
+          let dmg = BULLET_DAMAGE;
+          let shieldDamage = 0;
+          let hpDamage = 0;
+          let shieldBroken = false;
+
+          // Bouclier absorbe d'abord
+          if (p.shield > 0) {
+            const absorbed = Math.min(p.shield, dmg);
+            p.shield -= absorbed;
+            shieldDamage = absorbed;
+            dmg -= absorbed;
+            if (p.shield <= 0 && absorbed > 0) shieldBroken = true;
+          }
+          // Puis les HP
+          if (dmg > 0) {
+            p.hp -= dmg;
+            hpDamage = dmg;
+          }
+
+          hit = true;
+
+          // Événement hit (chiffres flottants)
+          io.to(room.id).emit("hit", {
+            targetId: id,
+            attackerId: b.owner,
+            x: p.x,
+            y: p.y,
+            shieldDamage,
+            hpDamage,
+            shieldBroken
+          });
+
+          // Bouclier cassé → animation + shake
+          if (shieldBroken) {
+            io.to(room.id).emit("shield-broken", {
+              targetId: id,
+              x: p.x,
+              y: p.y
+            });
+
+            const victimSocket = io.sockets.sockets.get(id);
+            if (victimSocket) victimSocket.emit("screen-shake");
+          }
+
+          if (p.hp <= 0) {
+            p.hp = 0;
+            p.alive = false;
+          }
+          break;
+        }
+      }
+      if (hit) room.bullets.splice(i, 1);
     }
 
-    if (room.players.size === 0) {
-        rooms.delete(room.id);
-        return;
+    // ---------- VICTOIRE (dernier survivant) ----------
+    const aliveIds = Object.keys(room.players).filter(
+      id => room.players[id].alive
+    );
+    const totalPlayers = Object.keys(room.players).length;
+
+    if (
+      totalPlayers >= 2 &&
+      aliveIds.length === 1 &&
+      !room.victoryDeclared
+    ) {
+      const winnerId = aliveIds[0];
+      room.victoryDeclared = true;
+      room.gameStarted = false;
+      room.bullets = [];
+
+      io.to(room.id).emit("victory", { winnerId });
+
+      // Reset tous les joueurs pour la prochaine manche
+      for (const id in room.players) {
+        const p = room.players[id];
+        p.ready = false;
+        p.hp = MAX_HP;
+        p.shield = MAX_SHIELD;
+        p.alive = true;
+        p.spectating = null;
+        p.spectators = 0;
+      }
+
+      io.to(room.id).emit("game-ended");
+      broadcastLobby(room);
     }
 
-    broadcastRoom(room);
+    // ---------- ENVOI DE L'ÉTAT (30 Hz pour économiser le réseau) ----------
+    if (tickCounter % 2 === 0) {
+      io.to(room.id).emit("state", buildState(room));
+    }
+  }
 }
 
-function broadcastRoom(room) {
-    io.to(room.id).emit("roomState", {
-        room: publicRoom(room),
-        players: getRoomPlayers(room)
-    });
-}
+setInterval(tick, 1000 / 60);
 
-// --------------------------------------------------
-// SERVER TICK
-// --------------------------------------------------
-
-setInterval(() => {
-    const dt = TICK_MS / 1000;
-
-    for (const room of rooms.values()) {
-        updateRoom(room, dt);
-
-        io.to(room.id).emit("gameState", {
-            players: getRoomPlayers(room),
-            bullets: room.bullets.map(bullet => ({
-                id: bullet.id,
-                x: bullet.x,
-                y: bullet.y
-            }))
-        });
-    }
-}, TICK_MS);
-
-// --------------------------------------------------
-// START
-// --------------------------------------------------
-
-server.listen(PORT, HOST, () => {
-    console.log("--------------------------------");
-    console.log(" STELLAR GAME SERVER");
-    console.log("--------------------------------");
-    console.log(`Listening on ${HOST}:${PORT}`);
-    console.log(`Players: ${io.engine.clientsCount}`);
+// ==================================================================
+//  DÉMARRAGE
+// ==================================================================
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`✅ Stellar Game — Serveur démarré sur le port ${PORT}`);
 });

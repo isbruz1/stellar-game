@@ -1,15 +1,26 @@
 {
   "name": "stellar-game",
-  "version": "2.0.0",
-  "private": true,
+  "version": "1.0.0",
+  "description": "Jeu de tanks multijoueur en ligne - Stellar Game",
+  "main": "server.js",
   "scripts": {
-    "start": "node server.js"
-  },
-  "dependencies": {
-    "express": "^5.1.0",
-    "socket.io": "^4.8.1"
+    "start": "node server.js",
+    "dev": "node server.js"
   },
   "engines": {
-    "node": ">=20 <25"
-  }
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
+  },
+  "keywords": [
+    "game",
+    "multiplayer",
+    "socket.io",
+    "tank",
+    "stellar"
+  ],
+  "author": "isbruz1",
+  "license": "MIT"
 }

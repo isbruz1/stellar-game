@@ -1,458 +1,256 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width,
-        initial-scale=1,
-        maximum-scale=1,
-        user-scalable=no,
-        viewport-fit=cover"
-    >
-
-    <meta name="theme-color" content="#080b14">
-
-    <title>Stellar Game</title>
-
-    <link rel="stylesheet" href="style.css">
-
-    <script src="/socket.io/socket.io.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>Stellar Game</title>
+  <link rel="icon" type="image/png" href="assets/stellar.png">
+  <link rel="apple-touch-icon" href="assets/stellar.png">
+  <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
 
-<div id="app">
-
-    <!-- SPLASH -->
-
-    <section id="splashScreen" class="screen active">
-        <div class="stellar-logo">
-            <div class="logo-orbit"></div>
-            <div class="logo-star">✦</div>
-        </div>
-
-        <h1>STELLAR</h1>
-        <p>GAME</p>
-
-        <div class="loading">
-            <div id="loadingBar"></div>
-        </div>
-
-        <span class="loading-text">Connexion au serveur...</span>
-    </section>
-
-
-    <!-- PROFILE -->
-
-    <section id="profileScreen" class="screen">
-
-        <div class="panel profile-panel">
-
-            <div class="brand-small">
-                <span>✦</span>
-                STELLAR GAME
-            </div>
-
-            <h2>Bienvenue</h2>
-
-            <p class="subtitle">
-                Choisis ton pseudo pour commencer.
-            </p>
-
-            <input
-                id="playerName"
-                class="input"
-                type="text"
-                maxlength="16"
-                placeholder="Ton pseudo"
-                autocomplete="off"
-            >
-
-            <button id="continueButton" class="primary-button">
-                CONTINUER
-            </button>
-
-            <div id="profileError" class="error"></div>
-
-        </div>
-
-    </section>
-
-
-    <!-- LOBBY -->
-
-    <section id="lobbyScreen" class="screen">
-
-        <header class="topbar">
-
-            <div class="brand">
-                <span>✦</span>
-                STELLAR
-            </div>
-
-            <div class="connection">
-                <span id="connectionDot"></span>
-                <span id="connectionText">Connexion</span>
-            </div>
-
-        </header>
-
-        <main class="lobby">
-
-            <div class="lobby-hero">
-
-                <div>
-                    <div class="eyebrow">
-                        MULTIPLAYER
-                    </div>
-
-                    <h1>
-                        Bienvenue,
-                        <span id="welcomeName">Player</span>
-                    </h1>
-
-                    <p>
-                        Rejoins un serveur ou crée ton propre salon.
-                    </p>
-                </div>
-
-                <button id="quickPlayButton" class="play-button">
-                    <span class="play-icon">▶</span>
-                    <span>
-                        <strong>JOUER</strong>
-                        <small>Rejoindre rapidement</small>
-                    </span>
-                </button>
-
-            </div>
-
-
-            <div class="server-actions">
-
-                <div class="panel action-card">
-                    <div class="card-icon">＋</div>
-
-                    <div>
-                        <h3>Créer un serveur</h3>
-                        <p>Crée ton propre salon.</p>
-                    </div>
-
-                    <button id="createServerButton" class="secondary-button">
-                        CRÉER
-                    </button>
-                </div>
-
-                <div class="panel action-card">
-                    <div class="card-icon">⌕</div>
-
-                    <div>
-                        <h3>Rejoindre avec un code</h3>
-                        <p>Entre le code d'un ami.</p>
-                    </div>
-
-                    <button id="joinCodeButton" class="secondary-button">
-                        REJOINDRE
-                    </button>
-                </div>
-
-            </div>
-
-
-            <div class="servers-section">
-
-                <div class="section-title">
-                    <h2>Serveurs disponibles</h2>
-
-                    <button id="refreshServersButton">
-                        ↻ Actualiser
-                    </button>
-                </div>
-
-                <div id="serverList" class="server-list"></div>
-
-            </div>
-
-        </main>
-
-    </section>
-
-
-    <!-- CREATE SERVER MODAL -->
-
-    <div id="createModal" class="modal">
-
-        <div class="modal-box">
-
-            <button class="close-modal" data-close="createModal">
-                ×
-            </button>
-
-            <h2>Créer un serveur</h2>
-
-            <p>
-                Donne un nom à ton salon.
-            </p>
-
-            <input
-                id="serverNameInput"
-                class="input"
-                maxlength="24"
-                placeholder="Ex : Salon de Stellar"
-            >
-
-            <button id="confirmCreateButton" class="primary-button">
-                CRÉER LE SERVEUR
-            </button>
-
-        </div>
-
-    </div>
-
-
-    <!-- JOIN CODE MODAL -->
-
-    <div id="joinModal" class="modal">
-
-        <div class="modal-box">
-
-            <button class="close-modal" data-close="joinModal">
-                ×
-            </button>
-
-            <h2>Rejoindre un serveur</h2>
-
-            <p>
-                Entre le code de ton ami.
-            </p>
-
-            <input
-                id="roomCodeInput"
-                class="input code-input"
-                maxlength="6"
-                placeholder="ABC123"
-                autocomplete="off"
-            >
-
-            <button id="confirmJoinButton" class="primary-button">
-                REJOINDRE
-            </button>
-
-        </div>
-
-    </div>
-
-
-    <!-- ROOM -->
-
-    <section id="roomScreen" class="screen">
-
-        <header class="topbar">
-
-            <div>
-                <button id="leaveRoomButton" class="back-button">
-                    ←
-                </button>
-
-                <span id="roomTitle">
-                    Stellar Server
-                </span>
-            </div>
-
-            <div class="room-code">
-                CODE :
-                <strong id="roomCode">------</strong>
-                <button id="copyRoomCodeButton">COPIER</button>
-            </div>
-
-        </header>
-
-
-        <main class="room-layout">
-
-            <div class="panel room-main">
-
-                <div class="room-header">
-
-                    <div>
-                        <span class="eyebrow">SALON</span>
-                        <h1 id="roomName">Stellar Server</h1>
-                    </div>
-
-                    <div id="hostBadge" class="badge hidden">
-                        HÔTE
-                    </div>
-
-                </div>
-
-
-                <div id="playerList" class="player-list"></div>
-
-
-                <div class="room-bottom">
-
-                    <div id="readyStatus" class="ready-status">
-                        Pas prêt
-                    </div>
-
-                    <button
-                        id="readyButton"
-                        class="secondary-button"
-                    >
-                        SE PRÉPARER
-                    </button>
-
-                    <button
-                        id="startGameButton"
-                        class="play-button hidden"
-                    >
-                        ▶ JOUER
-                    </button>
-
-                </div>
-
-            </div>
-
-        </main>
-
-    </section>
-
-
-    <!-- GAME -->
-
-    <section id="gameScreen" class="game-screen">
-
-        <canvas id="gameCanvas"></canvas>
-
-
-        <!-- HUD -->
-
-        <div id="gameHud">
-
-            <div class="hud-top">
-
-                <div class="hud-player">
-
-                    <div
-                        id="hudColor"
-                        class="hud-avatar"
-                    >
-                        ✦
-                    </div>
-
-                    <div>
-                        <strong id="hudName">
-                            Player
-                        </strong>
-
-                        <div class="health-container">
-                            <div
-                                id="healthBar"
-                                class="health-bar"
-                            ></div>
-                        </div>
-                    </div>
-
-                </div>
-
-
-                <div class="scoreboard">
-
-                    <div>
-                        <small>ÉLIMINATIONS</small>
-                        <strong id="killsValue">0</strong>
-                    </div>
-
-                    <div>
-                        <small>MORTS</small>
-                        <strong id="deathsValue">0</strong>
-                    </div>
-
-                </div>
-
-            </div>
-
-
-            <div id="killFeed"></div>
-
-
-            <div class="game-buttons">
-
-                <button id="fullscreenButton">
-                    ⛶
-                </button>
-
-                <button id="leaveGameButton">
-                    ✕
-                </button>
-
-            </div>
-
-
-            <!-- DESKTOP CROSSHAIR -->
-
-            <div id="crosshair">
-                <span></span>
-                <span></span>
-                <span></span>
-                <span></span>
-            </div>
-
-
-            <!-- MOBILE CONTROLS -->
-
-            <div id="mobileControls">
-
-                <div
-                    id="moveJoystick"
-                    class="joystick"
-                >
-                    <div class="joystick-ring"></div>
-                    <div class="joystick-knob"></div>
-                </div>
-
-
-                <div
-                    id="aimJoystick"
-                    class="joystick"
-                >
-                    <div class="joystick-ring"></div>
-                    <div class="joystick-knob"></div>
-                </div>
-
-
-                <button
-                    id="shootButton"
-                    class="shoot-button"
-                >
-                    ●
-                </button>
-
-            </div>
-
-
-            <div
-                id="mobileLandscapeMessage"
-                class="landscape-message"
-            >
-                <div>⟳</div>
-                <strong>Tourne ton téléphone</strong>
-                <span>Stellar Game se joue en paysage.</span>
-            </div>
-
-        </div>
-
-    </section>
-
-
-    <!-- TOAST -->
-
-    <div id="toastContainer"></div>
-
+<!-- LANDSCAPE WARNING -->
+<div id="landscapeWarning" class="landscape-warning hidden">
+  <div class="rotate-phone">
+    <div class="phone-icon">📱</div>
+    <div class="rotate-arrow">↻</div>
+  </div>
+  <h1>TOURNE TON TÉLÉPHONE</h1>
+  <p>Le jeu se joue en <strong>MODE PAYSAGE</strong></p>
+  <div class="rotate-hint"><span>→</span><span>→</span><span>→</span></div>
 </div>
 
-<script src="game.js"></script>
+<!-- SPLASH -->
+<div id="splashScreen" class="screen splash-screen">
+  <canvas id="galaxyCanvas"></canvas>
+  <div class="splash-content">
+    <div class="splash-logo-wrap">
+      <div class="splash-ring"></div>
+      <div class="splash-ring splash-ring-2"></div>
+      <img src="assets/stellar.png" class="splash-logo">
+    </div>
+    <div class="splash-title">STELLAR&nbsp;GAME</div>
+    <div id="deviceBadge" class="device-badge">
+      <span id="deviceIcon">🔍</span>
+      <span id="deviceLabel">DÉTECTION…</span>
+    </div>
+    <div class="splash-loader"><div class="splash-loader-bar"></div></div>
+  </div>
+</div>
 
+<!-- PROFILES -->
+<div id="profilesScreen" class="screen profiles-screen hidden">
+  <canvas id="profilesCanvas"></canvas>
+  <div class="profiles-header">
+    <img src="assets/stellar.png" class="mini-logo">
+    <h1>CHOISIS TON PROFIL</h1>
+    <p class="muted">Sélectionne un compte ou crée-en un nouveau</p>
+  </div>
+  <div class="profiles-content">
+    <div id="accountList" class="account-list"></div>
+    <div class="account-right">
+      <div class="selected-preview">
+        <canvas id="previewCanvas" width="200" height="200"></canvas>
+        <div id="previewPseudo" class="preview-pseudo">—</div>
+        <div id="previewReal" class="preview-real">—</div>
+        <div class="preview-skins-label">TON TANK</div>
+        <div id="previewSkinPicker" class="preview-skins"></div>
+        <button id="enterLobbyBtn" class="btn btn-green" disabled>JOUER</button>
+      </div>
+    </div>
+  </div>
+  <div class="profiles-footer">
+    <button id="newAccountBtn" class="btn btn-yellow">+ NOUVEAU COMPTE</button>
+  </div>
+</div>
+
+<!-- NEW ACCOUNT -->
+<div id="newAccountScreen" class="screen new-account-screen hidden">
+  <canvas id="newAccountCanvas"></canvas>
+  <div class="login-box">
+    <div class="login-glow"></div>
+    <img src="assets/stellar.png" class="login-logo">
+    <h1>NOUVEAU PILOTE</h1>
+    <p class="login-sub">Étape 1/2 — Ton identité</p>
+    <label>Pseudo (5 car. min.)</label>
+    <input id="pseudoInput" type="text" maxlength="16" autocomplete="off" spellcheck="false">
+    <div id="pseudoError" class="error-msg"></div>
+    <label>Nom réel</label>
+    <input id="realNameInput" type="text" maxlength="32" autocomplete="off" spellcheck="false">
+    <button id="nextToSkinBtn" class="btn btn-green" disabled>SUIVANT →</button>
+    <button id="backToProfilesBtn" class="btn btn-red">ANNULER</button>
+  </div>
+</div>
+
+<!-- SKIN SELECT -->
+<div id="skinSelectScreen" class="screen new-account-screen hidden">
+  <canvas id="skinSelectCanvas"></canvas>
+  <div class="login-box">
+    <div class="login-glow"></div>
+    <img src="assets/stellar.png" class="login-logo">
+    <h1>CHOISIS TON TANK</h1>
+    <p class="login-sub">Étape 2/2</p>
+    <div id="skinGrid" class="skin-grid"></div>
+    <button id="finishAccountBtn" class="btn btn-green">TERMINER ✓</button>
+    <button id="backToNameBtn" class="btn btn-red">← RETOUR</button>
+  </div>
+</div>
+
+<!-- MAIN MENU -->
+<div id="mainMenuScreen" class="screen hidden">
+  <canvas id="menuCanvas"></canvas>
+  <div class="top-bar">
+    <div class="logo">
+      <img src="assets/stellar.png" class="logo-img">
+      <span>STELLAR GAME</span>
+    </div>
+    <div class="top-actions">
+      <div class="user-chip">
+        <span id="userPseudo">—</span>
+        <span id="userReal" class="user-real">—</span>
+      </div>
+      <button id="disconnectBtn" class="icon-btn" title="Déconnexion">🚪</button>
+    </div>
+  </div>
+  <div class="menu-content">
+    <h1 class="menu-title">PRÊT POUR LE DÉCOLLAGE ?</h1>
+    <p class="menu-sub" id="controlsHint">Rejoins une partie ou crée ton propre serveur</p>
+    <button id="playBtn" class="btn btn-green btn-huge">JOUER</button>
+  </div>
+  <div class="menu-footer"><span id="onlineCount">0 serveur actif</span></div>
+</div>
+
+<!-- SERVER BROWSER -->
+<div id="serverBrowser" class="screen hidden">
+  <div class="browser-header">
+    <button id="closeBrowser" class="icon-btn">←</button>
+    <h2>NAVIGATEUR DE SERVEURS</h2>
+    <div style="width:44px"></div>
+  </div>
+  <div class="browser-tabs">
+    <button class="tab-btn active" data-tab="join">REJOINDRE</button>
+    <button class="tab-btn" data-tab="create">CRÉER</button>
+  </div>
+  <div id="tab-join" class="tab-panel">
+    <div class="join-by-code">
+      <input id="codeInput" type="text" maxlength="5" placeholder="CODE" autocomplete="off">
+      <button id="joinByCodeBtn" class="btn btn-green small">REJOINDRE</button>
+    </div>
+    <div class="refresh-row">
+      <button id="refreshRooms" class="btn-refresh">🔄 Rafraîchir</button>
+      <span id="roomsCount" class="muted">—</span>
+    </div>
+    <div id="roomsList" class="rooms-list"></div>
+  </div>
+  <div id="tab-create" class="tab-panel hidden">
+    <div class="create-form">
+      <label>Nom du serveur</label>
+      <input id="serverNameInput" type="text" maxlength="24" placeholder="Mon serveur">
+      <button id="createRoomBtn" class="btn btn-green">CRÉER</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOBBY -->
+<div id="lobbyScreen" class="screen hidden">
+  <div class="top-bar">
+    <div class="logo">
+      <img src="assets/stellar.png" class="logo-img">
+      <span>STELLAR GAME</span>
+    </div>
+    <div class="top-actions">
+      <div class="room-code-chip">CODE : <strong id="roomCodeDisplay">—</strong></div>
+    </div>
+  </div>
+  <div class="lobby-content">
+    <h2>SALON <span id="playerCount">(0)</span> <span id="roomNameDisplay" class="room-name"></span></h2>
+    <div class="players-grid" id="playersGrid"></div>
+  </div>
+  <div class="bottom-bar">
+    <button id="quitBtn" class="btn btn-red hidden">QUITTER LE SERVEUR</button>
+    <button id="actionBtn" class="btn btn-green" disabled>...</button>
+  </div>
+</div>
+
+<!-- GAME -->
+<div id="gameScreen" class="screen hidden">
+  <canvas id="game"></canvas>
+
+  <div id="hud">
+    <button id="leaveGameBtn" class="icon-btn" title="Retour au salon">←</button>
+    <div id="aliveCounter" class="alive-counter"></div>
+    <div id="scoreboard"></div>
+    <div id="statusBars">
+      <div class="bar-wrap">
+        <div class="bar-label">HP</div>
+        <div class="bar"><div id="hpBar" class="bar-fill hp"></div></div>
+      </div>
+      <div class="bar-wrap">
+        <div class="bar-label">🛡</div>
+        <div class="bar"><div id="shieldBar" class="bar-fill shield"></div></div>
+      </div>
+    </div>
+    <canvas id="minimap" width="180" height="180"></canvas>
+  </div>
+
+  <div id="touchControls" class="touch-controls hidden">
+    <div id="moveJoystick" class="joystick joystick-move">
+      <div class="joystick-label">DÉPLACER</div>
+      <div class="joystick-ring"><div id="moveKnob" class="joystick-knob"></div></div>
+    </div>
+    <div id="aimJoystick" class="joystick joystick-aim">
+      <div class="joystick-label">VISER · TIRER</div>
+      <div class="joystick-ring"><div id="aimKnob" class="joystick-knob"></div></div>
+    </div>
+  </div>
+
+  <div id="deathScreen" class="death-screen hidden">
+    <div class="death-content">
+      <h1>TU ES MORT</h1>
+      <p class="death-sub">Éliminé au combat</p>
+      <div class="death-buttons">
+        <button id="backToLobbyBtn" class="btn btn-green">RETOUR AU SALON</button>
+        <button id="spectateBtn" class="btn btn-yellow">👁 SPECTATEUR</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="spectatePanel" class="spectate-panel hidden">
+    <div class="spectate-title">👁 MODE SPECTATEUR</div>
+    <div id="spectateList" class="spectate-list"></div>
+    <button id="stopSpectateBtn" class="btn btn-red">STOP</button>
+  </div>
+</div>
+
+<!-- VICTORY -->
+<div id="victoryScreen" class="victory-screen hidden">
+  <div class="victory-content">
+    <div class="victory-trophy">🏆</div>
+    <h1>VICTOIRE</h1>
+    <p class="victory-sub">DERNIER SURVIVANT DE LA GALAXIE</p>
+    <button id="returnToServerBtn" class="btn btn-green btn-huge">RETOUR AU SERVEUR</button>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div id="settingsModal" class="modal hidden">
+  <div class="modal-content">
+    <h2>Paramètres</h2>
+    <label>Pseudo</label>
+    <input id="settingsPseudo" type="text" maxlength="16">
+    <label>Nom réel</label>
+    <input id="settingsRealName" type="text" maxlength="32">
+    <label>Skin</label>
+    <div id="skinPicker" class="skins-row"></div>
+    <button id="closeSettings" class="btn btn-green">FERMER</button>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="skins.js"></script>
+<script src="game.js"></script>
 </body>
 </html>
