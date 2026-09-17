@@ -9,7 +9,7 @@ const io = new Server(server, { cors: { origin: "*" } });
 app.use(express.static(path.join(__dirname, "public")));
 
 // ---------- Constantes ----------
-const MAP_W = 3200, MAP_H = 3200;
+const MAP_W = 4500, MAP_H = 4500;
 const PLAYER_RADIUS = 24;
 const PLAYER_SPEED = 3.4;
 const BULLET_SPEED = 9;
@@ -18,17 +18,17 @@ const BULLET_DAMAGE = 25;
 const SHOOT_COOLDOWN = 350;
 const MAX_HP = 100;
 const MAX_SHIELD = 100;
-const MAX_PLAYERS = 8;
+const MAX_PLAYERS = 32;
 
 // ---------- Comptes actifs ----------
 const activeAccounts = {};
-
 function broadcastLockedAccounts() {
   io.emit("locked-accounts", Object.values(activeAccounts).map(a => a.pseudoOriginal));
 }
 
 // ---------- Rooms ----------
 const rooms = {};
+let tickCounter = 0;
 
 function genRoomId() {
   const c = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -80,11 +80,11 @@ function genForest() {
 
 function generateMap() {
   const walls = [];
-  for (let i = 0; i < 18; i++) walls.push(genWall());
+  for (let i = 0; i < 28; i++) walls.push(genWall());
   const rivers = [];
-  for (let i = 0; i < 2; i++) rivers.push(genRiver());
+  for (let i = 0; i < 3; i++) rivers.push(genRiver());
   const forests = [];
-  for (let i = 0; i < 6; i++) forests.push(genForest());
+  for (let i = 0; i < 9; i++) forests.push(genForest());
   return { walls, rivers, forests };
 }
 
@@ -208,11 +208,14 @@ function resetForGame(room) {
   room.victoryDeclared = false;
 
   const ids = Object.keys(room.players);
+  const count = ids.length;
+  const spawnRadius = Math.min(1400, 300 + count * 30);
+
   ids.forEach((id, i) => {
     const p = room.players[id];
-    const a = (i / ids.length) * Math.PI * 2;
-    const preferX = MAP_W / 2 + Math.cos(a) * 400;
-    const preferY = MAP_H / 2 + Math.sin(a) * 400;
+    const a = (i / count) * Math.PI * 2;
+    const preferX = MAP_W / 2 + Math.cos(a) * spawnRadius;
+    const preferY = MAP_H / 2 + Math.sin(a) * spawnRadius;
 
     const safe = findSafeSpawn(room, preferX, preferY);
     p.x = safe.x;
@@ -235,11 +238,9 @@ io.on("connection", socket => {
 
   socket.on("list-rooms", () => socket.emit("room-list-update", roomList()));
 
-  // ===== Comptes =====
   socket.on("claim-account", pseudo => {
     const key = String(pseudo || "").toLowerCase();
     if (!key) return socket.emit("claim-result", { ok: false, reason: "pseudo invalide" });
-
     const existing = activeAccounts[key];
     if (existing && existing.socketId !== socket.id) {
       socket.emit("claim-result", { ok: false, reason: "Ce compte est déjà utilisé ailleurs." });
@@ -258,7 +259,6 @@ io.on("connection", socket => {
     }
   });
 
-  // ===== Rooms =====
   socket.on("create-room", data => {
     const room = createRoom(data.name, socket.id);
     currentRoom = room.id;
@@ -386,7 +386,6 @@ io.on("connection", socket => {
     p.spectating = null;
   });
 
-  // ===== INPUT =====
   socket.on("input", data => {
     const room = rooms[currentRoom];
     if (!room) return;
@@ -430,7 +429,6 @@ io.on("connection", socket => {
     if (typeof data.angle === "number") p.angle = data.angle;
   });
 
-  // ===== TIR =====
   socket.on("shoot", data => {
     const room = rooms[currentRoom];
     if (!room) return;
@@ -499,11 +497,11 @@ io.on("connection", socket => {
 
 // ---------- Tick ----------
 function tick() {
+  tickCounter++;
   for (const rid in rooms) {
     const room = rooms[rid];
     if (!room.gameStarted) continue;
 
-    // Balles
     for (let i = room.bullets.length - 1; i >= 0; i--) {
       const b = room.bullets[i];
       b.x += b.vx;
@@ -514,15 +512,11 @@ function tick() {
 
       let dead = false;
       if (b.life <= 0 || b.x < 0 || b.x > MAP_W || b.y < 0 || b.y > MAP_H) dead = true;
-
       if (!dead && !b.ignoreWalls && room.mapData &&
-          isInsideWall(room.mapData.walls, b.x, b.y, 4)) {
-        dead = true;
-      }
+          isInsideWall(room.mapData.walls, b.x, b.y, 4)) dead = true;
 
       if (dead) { room.bullets.splice(i, 1); continue; }
 
-      // Collision joueur
       let hit = false;
       for (const id in room.players) {
         if (id === b.owner) continue;
@@ -534,7 +528,6 @@ function tick() {
           let hpDamage = 0;
           let shieldBroken = false;
 
-          // Bouclier absorbe d'abord
           if (p.shield > 0) {
             const absorbed = Math.min(p.shield, dmg);
             p.shield -= absorbed;
@@ -546,42 +539,26 @@ function tick() {
             p.hp -= dmg;
             hpDamage = dmg;
           }
-
           hit = true;
 
-          // Événement hit (chiffres flottants)
           io.to(room.id).emit("hit", {
-            targetId: id,
-            attackerId: b.owner,
-            x: p.x,
-            y: p.y,
-            shieldDamage,
-            hpDamage,
-            shieldBroken
+            targetId: id, attackerId: b.owner, x: p.x, y: p.y,
+            shieldDamage, hpDamage, shieldBroken
           });
 
-          // Bouclier cassé → animation + shake
           if (shieldBroken) {
-            io.to(room.id).emit("shield-broken", {
-              targetId: id,
-              x: p.x,
-              y: p.y
-            });
+            io.to(room.id).emit("shield-broken", { targetId: id, x: p.x, y: p.y });
             const victimSocket = io.sockets.sockets.get(id);
             if (victimSocket) victimSocket.emit("screen-shake");
           }
 
-          if (p.hp <= 0) {
-            p.hp = 0;
-            p.alive = false;
-          }
+          if (p.hp <= 0) { p.hp = 0; p.alive = false; }
           break;
         }
       }
       if (hit) room.bullets.splice(i, 1);
     }
 
-    // Victoire
     const aliveIds = Object.keys(room.players).filter(id => room.players[id].alive);
     const totalPlayers = Object.keys(room.players).length;
 
@@ -590,9 +567,7 @@ function tick() {
       room.victoryDeclared = true;
       room.gameStarted = false;
       room.bullets = [];
-
       io.to(room.id).emit("victory", { winnerId });
-
       for (const id in room.players) {
         const p = room.players[id];
         p.ready = false;
@@ -602,12 +577,13 @@ function tick() {
         p.spectating = null;
         p.spectators = 0;
       }
-
       io.to(room.id).emit("game-ended");
       broadcastLobby(room);
     }
 
-    io.to(room.id).emit("state", buildState(room));
+    if (tickCounter % 2 === 0) {
+      io.to(room.id).emit("state", buildState(room));
+    }
   }
 }
 setInterval(tick, 1000 / 60);

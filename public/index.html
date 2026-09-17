@@ -4,11 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1">
   <title>Stellar Game</title>
+  <link rel="icon" type="image/png" href="assets/stellar.png">
+  <link rel="apple-touch-icon" href="assets/stellar.png">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<!-- ============ SPLASH ============ -->
+<!-- SPLASH -->
 <div id="splashScreen" class="screen splash-screen">
   <canvas id="galaxyCanvas"></canvas>
   <div class="splash-content">
@@ -18,18 +20,15 @@
       <img src="assets/stellar.png" class="splash-logo">
     </div>
     <div class="splash-title">STELLAR&nbsp;GAME</div>
-
-    <!-- BADGE DE DÉTECTION APPAREIL -->
     <div id="deviceBadge" class="device-badge">
       <span id="deviceIcon">🔍</span>
       <span id="deviceLabel">DÉTECTION…</span>
     </div>
-
     <div class="splash-loader"><div class="splash-loader-bar"></div></div>
   </div>
 </div>
 
-<!-- ============ PROFILES ============ -->
+<!-- PROFILES -->
 <div id="profilesScreen" class="screen profiles-screen hidden">
   <canvas id="profilesCanvas"></canvas>
   <div class="profiles-header">
@@ -55,7 +54,7 @@
   </div>
 </div>
 
-<!-- ============ NEW ACCOUNT ============ -->
+<!-- NEW ACCOUNT -->
 <div id="newAccountScreen" class="screen new-account-screen hidden">
   <canvas id="newAccountCanvas"></canvas>
   <div class="login-box">
@@ -73,7 +72,7 @@
   </div>
 </div>
 
-<!-- ============ SKIN SELECT ============ -->
+<!-- SKIN SELECT -->
 <div id="skinSelectScreen" class="screen new-account-screen hidden">
   <canvas id="skinSelectCanvas"></canvas>
   <div class="login-box">
@@ -87,7 +86,7 @@
   </div>
 </div>
 
-<!-- ============ MAIN MENU ============ -->
+<!-- MAIN MENU -->
 <div id="mainMenuScreen" class="screen hidden">
   <canvas id="menuCanvas"></canvas>
   <div class="top-bar">
@@ -113,7 +112,7 @@
   </div>
 </div>
 
-<!-- ============ SERVER BROWSER ============ -->
+<!-- SERVER BROWSER -->
 <div id="serverBrowser" class="screen hidden">
   <div class="browser-header">
     <button id="closeBrowser" class="icon-btn">←</button>
@@ -144,7 +143,7 @@
   </div>
 </div>
 
-<!-- ============ LOBBY ============ -->
+<!-- LOBBY -->
 <div id="lobbyScreen" class="screen hidden">
   <div class="top-bar">
     <div class="logo">
@@ -165,15 +164,13 @@
   </div>
 </div>
 
-<!-- ============ GAME ============ -->
+<!-- GAME -->
 <div id="gameScreen" class="screen hidden">
   <canvas id="game"></canvas>
-
   <div id="hud">
     <button id="leaveGameBtn" class="icon-btn" title="Retour au salon">←</button>
     <div id="aliveCounter" class="alive-counter"></div>
     <div id="scoreboard"></div>
-
     <div id="statusBars">
       <div class="bar-wrap">
         <div class="bar-label">HP</div>
@@ -184,11 +181,9 @@
         <div class="bar"><div id="shieldBar" class="bar-fill shield"></div></div>
       </div>
     </div>
-
     <canvas id="minimap" width="180" height="180"></canvas>
   </div>
 
-  <!-- TOUCH CONTROLS -->
   <div id="touchControls" class="touch-controls hidden">
     <div id="joystickZone" class="joystick-zone">
       <div id="joystickBase" class="joystick-base hidden">
@@ -200,7 +195,6 @@
     </div>
   </div>
 
-  <!-- DEATH SCREEN -->
   <div id="deathScreen" class="death-screen hidden">
     <div class="death-content">
       <h1>TU ES MORT</h1>
@@ -219,7 +213,7 @@
   </div>
 </div>
 
-<!-- ============ VICTORY ============ -->
+<!-- VICTORY -->
 <div id="victoryScreen" class="victory-screen hidden">
   <div class="victory-content">
     <div class="victory-trophy">🏆</div>
@@ -229,7 +223,7 @@
   </div>
 </div>
 
-<!-- ============ SETTINGS ============ -->
+<!-- SETTINGS -->
 <div id="settingsModal" class="modal hidden">
   <div class="modal-content">
     <h2>Paramètres</h2>

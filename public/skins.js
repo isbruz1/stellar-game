@@ -13,12 +13,10 @@ function drawTankShape(ctx, skinId, angle = 0, scale = 1) {
   ctx.rotate(angle);
   ctx.scale(scale, scale);
 
-  // Chenilles
   ctx.fillStyle = s.tread;
   ctx.fillRect(-24, -20, 48, 9);
   ctx.fillRect(-24,  11, 48, 9);
 
-  // Crampons
   ctx.strokeStyle = "#000";
   ctx.lineWidth = 1.5;
   for (let i = -20; i <= 20; i += 6) {
@@ -28,24 +26,18 @@ function drawTankShape(ctx, skinId, angle = 0, scale = 1) {
     ctx.stroke();
   }
 
-  // Corps
   ctx.fillStyle = s.body;
   ctx.fillRect(-20, -13, 40, 26);
 
-  // Bande d'accent
   ctx.fillStyle = s.accent;
   ctx.fillRect(-20, -2, 40, 4);
 
-  // Tourelle
   ctx.beginPath();
   ctx.arc(0, 0, 11, 0, Math.PI * 2);
-  ctx.fillStyle = s.body;
-  ctx.fill();
+  ctx.fillStyle = s.body; ctx.fill();
   ctx.strokeStyle = s.accent;
-  ctx.lineWidth = 2.5;
-  ctx.stroke();
+  ctx.lineWidth = 2.5; ctx.stroke();
 
-  // Canon
   ctx.fillStyle = s.accent;
   ctx.fillRect(0, -3.5, 34, 7);
 
