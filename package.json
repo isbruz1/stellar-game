@@ -14,13 +14,7 @@
     "express": "^4.19.2",
     "socket.io": "^4.7.5"
   },
-  "keywords": [
-    "game",
-    "multiplayer",
-    "socket.io",
-    "tank",
-    "stellar"
-  ],
+  "keywords": ["game", "multiplayer", "socket.io", "tank", "stellar"],
   "author": "isbruz1",
   "license": "MIT"
 }

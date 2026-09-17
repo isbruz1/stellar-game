@@ -1,10 +1,10 @@
 /* ==================================================================
-   STELLAR GAME — Client V8
+   STELLAR GAME — Client V9
    - Détection appareil (PC / Mobile / Tablette / Console)
    - Mode paysage + plein écran auto
    - 2 joysticks fixes (bleu = bouger, rouge = viser/tirer)
    - Multi-comptes avec lock multi-onglets
-   - Menu → Navigateur de serveurs → Salon → Partie
+   - Menu → Navigateur → Salon → Partie
    - Chiffres de dégâts, bouclier brisé, screen shake
    - Écran de mort + spectateur + écran de victoire
    ================================================================== */
@@ -68,7 +68,7 @@ async function requestFullscreen() {
     if (screen.orientation && screen.orientation.lock) {
       try { await screen.orientation.lock("landscape"); } catch (e) {}
     }
-  } catch (e) { /* refusé par le navigateur */ }
+  } catch (e) { /* refusé */ }
 }
 
 window.addEventListener("resize", checkLandscape);
@@ -171,7 +171,6 @@ const keys = { up: false, down: false, left: false, right: false };
 let socket = null;
 let lockedAccounts = [];
 
-// Effets visuels
 let damageNumbers = [];
 let shieldBreakFx = [];
 let shakeTime = 0;
@@ -234,11 +233,11 @@ const settingsPseudo   = $("settingsPseudo");
 const settingsRealName = $("settingsRealName");
 const skinPicker       = $("skinPicker");
 
-const canvas   = $("game");
-const ctx      = canvas.getContext("2d");
-const minimap  = $("minimap");
-const mmCtx    = minimap.getContext("2d");
-const hpBar    = $("hpBar");
+const canvas    = $("game");
+const ctx       = canvas.getContext("2d");
+const minimap   = $("minimap");
+const mmCtx     = minimap.getContext("2d");
+const hpBar     = $("hpBar");
 const shieldBar = $("shieldBar");
 
 /* ============================================================
@@ -368,9 +367,7 @@ function connectSocket() {
         x: data.x + (Math.random() - 0.5) * 30,
         y: data.y - 30,
         value: Math.round(data.shieldDamage),
-        color: "#4af",
-        life: 60,
-        vy: -1.2
+        color: "#4af", life: 60, vy: -1.2
       });
     }
     if (data.hpDamage > 0) {
@@ -378,9 +375,7 @@ function connectSocket() {
         x: data.x + (Math.random() - 0.5) * 30,
         y: data.y - 50,
         value: Math.round(data.hpDamage),
-        color: "#fff",
-        life: 60,
-        vy: -1.4
+        color: "#fff", life: 60, vy: -1.4
       });
     }
   });
@@ -418,7 +413,7 @@ function connectSocket() {
 connectSocket();
 
 /* ============================================================
-   9. BACKGROUNDS (étoiles + galaxie)
+   9. BACKGROUNDS
    ============================================================ */
 function initStarfield(canvasId, opacity = 0.5) {
   const c = $(canvasId);
@@ -447,9 +442,7 @@ function initStarfield(canvasId, opacity = 0.5) {
       s.y += s.speed;
       if (s.y > c.height) { s.y = 0; s.x = Math.random() * c.width; }
       g.fillStyle = `rgba(180,220,255,${s.alpha})`;
-      g.beginPath();
-      g.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-      g.fill();
+      g.beginPath(); g.arc(s.x, s.y, s.r, 0, Math.PI * 2); g.fill();
     });
     requestAnimationFrame(loop);
   })();
@@ -457,6 +450,7 @@ function initStarfield(canvasId, opacity = 0.5) {
 
 (function initGalaxy() {
   const c = $("galaxyCanvas");
+  if (!c) return;
   const g = c.getContext("2d");
   let running = true;
   function resize() { c.width = window.innerWidth; c.height = window.innerHeight; }
@@ -504,9 +498,7 @@ function initStarfield(canvasId, opacity = 0.5) {
       s.alpha += (Math.random() - 0.5) * s.twinkle;
       s.alpha = Math.max(0.1, Math.min(0.9, s.alpha));
       g.fillStyle = `rgba(200,220,255,${s.alpha})`;
-      g.beginPath();
-      g.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-      g.fill();
+      g.beginPath(); g.arc(s.x, s.y, s.r, 0, Math.PI * 2); g.fill();
     });
 
     galaxy.forEach(p => {
@@ -514,9 +506,7 @@ function initStarfield(canvasId, opacity = 0.5) {
       const x = c.width / 2 + Math.cos(a) * p.dist;
       const y = c.height / 2 + Math.sin(a) * p.dist * 0.55;
       g.fillStyle = `hsla(${p.hue}, 80%, 65%, ${p.alpha})`;
-      g.beginPath();
-      g.arc(x, y, p.size, 0, Math.PI * 2);
-      g.fill();
+      g.beginPath(); g.arc(x, y, p.size, 0, Math.PI * 2); g.fill();
     });
 
     const core = g.createRadialGradient(
@@ -527,9 +517,7 @@ function initStarfield(canvasId, opacity = 0.5) {
     core.addColorStop(0.4, "rgba(80,120,220,0.15)");
     core.addColorStop(1, "rgba(0,0,0,0)");
     g.fillStyle = core;
-    g.beginPath();
-    g.arc(c.width / 2, c.height / 2, 180, 0, Math.PI * 2);
-    g.fill();
+    g.beginPath(); g.arc(c.width / 2, c.height / 2, 180, 0, Math.PI * 2); g.fill();
 
     requestAnimationFrame(loop);
   })();
@@ -543,7 +531,6 @@ function initStarfield(canvasId, opacity = 0.5) {
 showScreen("splash");
 checkLandscape();
 
-// Détection manette pendant le splash
 const detectInterval = setInterval(() => {
   const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
   let found = false;
@@ -636,7 +623,6 @@ function renderAccounts() {
     accountList.appendChild(card);
   });
 
-  // Sélection auto
   if (
     selectedAccountIdx < 0 ||
     selectedAccountIdx >= accounts.length ||
@@ -660,7 +646,6 @@ function previewAccount(acc) {
   previewReal.textContent = acc.realName || "";
   drawPreviewTank(acc.skin || 0);
 
-  // Picker de skins
   previewSkinPicker.innerHTML = "";
   SKINS.forEach((s, i) => {
     const c = document.createElement("canvas");
@@ -892,7 +877,7 @@ function esc(s) {
 }
 
 /* ============================================================
-   15. SALON (LOBBY)
+   15. SALON
    ============================================================ */
 function renderLobby() {
   playersGrid.innerHTML = "";
@@ -1023,7 +1008,7 @@ function renderSpectateList() {
 }
 
 /* ============================================================
-   17. ÉCRAN DE VICTOIRE
+   17. VICTOIRE
    ============================================================ */
 $("returnToServerBtn").addEventListener("click", () => {
   $("victoryScreen").classList.add("hidden");
@@ -1115,7 +1100,7 @@ function resetKnob(el) {
   el.style.transform = "translate(-50%, -50%)";
 }
 
-/* ---------- MOVE JOYSTICK (BLEU) ---------- */
+// ---------- MOVE (BLEU) ----------
 moveJoystick.addEventListener("touchstart", e => {
   if (!gameStarted || dead) return;
   e.preventDefault();
@@ -1173,7 +1158,7 @@ function endMoveJoystick(e) {
 moveJoystick.addEventListener("touchend", endMoveJoystick);
 moveJoystick.addEventListener("touchcancel", endMoveJoystick);
 
-/* ---------- AIM JOYSTICK (ROUGE) ---------- */
+// ---------- AIM (ROUGE) ----------
 aimJoystick.addEventListener("touchstart", e => {
   if (!gameStarted || dead) return;
   e.preventDefault();
@@ -1221,7 +1206,7 @@ function endAimJoystick(e) {
 aimJoystick.addEventListener("touchend", endAimJoystick);
 aimJoystick.addEventListener("touchcancel", endAimJoystick);
 
-/* ---------- TIR AUTO (joystick rouge actif) ---------- */
+// ---------- TIR AUTO (joystick rouge actif) ----------
 let lastTouchShot = 0;
 setInterval(() => {
   if (!aimJoyState.active) return;
@@ -1238,7 +1223,7 @@ setInterval(() => {
 }, 50);
 
 /* ============================================================
-   21. MANETTE (CONSOLE / PC)
+   21. MANETTE
    ============================================================ */
 let gamepadLastShot = 0;
 
@@ -1266,7 +1251,6 @@ function pollGamepad() {
       myAngle = Math.atan2(ly, lx);
     }
 
-    // RT (Xbox) / R2 (PS) = button 7 ; LT / L2 = button 6
     const rtPressed = gp.buttons[7] && gp.buttons[7].pressed;
     const ltPressed = gp.buttons[6] && gp.buttons[6].pressed;
     if ((rtPressed || ltPressed) && now - gamepadLastShot > 350) {
@@ -1282,7 +1266,7 @@ function pollGamepad() {
 pollGamepad();
 
 /* ============================================================
-   22. INPUT VERS LE SERVEUR (33ms = 30 Hz)
+   22. INPUT → SERVEUR
    ============================================================ */
 setInterval(() => {
   if (!gameStarted || !myId || !socket) return;
@@ -1320,7 +1304,7 @@ function getCamera() {
 }
 
 /* ============================================================
-   24. RENDU DU JEU
+   24. RENDU
    ============================================================ */
 function drawBiomes() {
   ctx.fillStyle = "#0f1a10";
@@ -1334,7 +1318,6 @@ function drawRivers() {
   const time = Date.now() / 1000;
 
   md.rivers.forEach(r => {
-    // Berges
     ctx.strokeStyle = "rgba(40, 30, 15, 0.8)";
     ctx.lineWidth = r.width + 24;
     ctx.lineCap = "round";
@@ -1346,12 +1329,10 @@ function drawRivers() {
     });
     ctx.stroke();
 
-    // Herbe / sable
     ctx.strokeStyle = "rgba(70, 90, 40, 0.5)";
     ctx.lineWidth = r.width + 12;
     ctx.stroke();
 
-    // Eau principale
     ctx.strokeStyle = "rgba(15, 45, 100, 0.95)";
     ctx.lineWidth = r.width;
     ctx.beginPath();
@@ -1361,12 +1342,10 @@ function drawRivers() {
     });
     ctx.stroke();
 
-    // Eau claire
     ctx.strokeStyle = "rgba(30, 80, 150, 0.7)";
     ctx.lineWidth = r.width * 0.7;
     ctx.stroke();
 
-    // Reflets animés
     ctx.strokeStyle = `rgba(120, 200, 255, ${0.4 + Math.sin(time * 1.5) * 0.15})`;
     ctx.lineWidth = r.width * 0.45;
     ctx.setLineDash([18, 28]);
@@ -1394,19 +1373,16 @@ function drawForests() {
 
       const sway = Math.sin(time * 1.2 + idx * 0.7) * 2.5;
 
-      // Ombre
       ctx.fillStyle = "rgba(0,0,0,0.45)";
       ctx.beginPath();
       ctx.ellipse(x + 6, y + t.r * 0.6, t.r * 0.95, t.r * 0.4, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // Tronc
       ctx.fillStyle = "#2a1808";
       ctx.fillRect(x - 5, y + t.r * 0.1, 10, t.r * 0.7);
       ctx.fillStyle = "#5a3a1a";
       ctx.fillRect(x - 5, y + t.r * 0.1, 4, t.r * 0.7);
 
-      // Feuillage en 3 couches
       ctx.fillStyle = "#0a1f0a";
       ctx.beginPath(); ctx.arc(x + sway * 0.3, y + t.r * 0.1, t.r, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = "#1a3a1a";
@@ -1414,7 +1390,6 @@ function drawForests() {
       ctx.fillStyle = "#2d5a28";
       ctx.beginPath(); ctx.arc(x - 4 + sway * 0.7, y - t.r * 0.35, t.r * 0.6, 0, Math.PI * 2); ctx.fill();
 
-      // Highlight
       ctx.fillStyle = "rgba(150, 220, 150, 0.4)";
       ctx.beginPath(); ctx.arc(x - 7 + sway * 0.8, y - t.r * 0.5, t.r * 0.28, 0, Math.PI * 2); ctx.fill();
     });
@@ -1430,20 +1405,16 @@ function drawWalls() {
     const x = w.x - cam.x, y = w.y - cam.y;
     if (x + w.w < 0 || x > canvas.width || y + w.h < 0 || y > canvas.height) return;
 
-    // Ombre
     ctx.fillStyle = "rgba(0,0,0,0.5)";
     ctx.fillRect(x + 4, y + 6, w.w, w.h);
 
-    // Corps
     ctx.fillStyle = "#3a3a4a";
     ctx.fillRect(x, y, w.w, w.h);
 
-    // Bordure
     ctx.strokeStyle = "#5a5a7a";
     ctx.lineWidth = 3;
     ctx.strokeRect(x, y, w.w, w.h);
 
-    // Reflet
     ctx.fillStyle = "rgba(255,255,255,0.06)";
     ctx.fillRect(x, y, w.w, 6);
   });
@@ -1480,13 +1451,11 @@ function drawPlayer(p, isMe) {
   const cam = getCamera();
   const x = p.x - cam.x, y = p.y - cam.y;
 
-  // Ombre
   ctx.fillStyle = "rgba(0,0,0,0.3)";
   ctx.beginPath();
   ctx.ellipse(x, y + 6, 32, 12, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Bouclier visuel
   if (p.shield > 0) {
     ctx.strokeStyle = `rgba(255,221,68,${0.3 + (p.shield / 100) * 0.5})`;
     ctx.lineWidth = 3;
@@ -1495,13 +1464,11 @@ function drawPlayer(p, isMe) {
     ctx.stroke();
   }
 
-  // Tank
   ctx.save();
   ctx.translate(x, y);
   drawTankShape(ctx, p.skin, p.angle);
   ctx.restore();
 
-  // Pseudo
   ctx.fillStyle = isMe ? "#4af" : "#fff";
   ctx.font = "bold 13px Segoe UI, Arial";
   ctx.textAlign = "center";
@@ -1521,7 +1488,6 @@ function drawBullets() {
   ctx.shadowBlur = 0;
 }
 
-/* ---------- Chiffres de dégâts ---------- */
 function updateDamageNumbers() {
   for (let i = damageNumbers.length - 1; i >= 0; i--) {
     const dn = damageNumbers[i];
@@ -1542,11 +1508,9 @@ function drawDamageNumbers() {
     ctx.font = "bold 22px Segoe UI, Arial";
     ctx.textAlign = "center";
 
-    // Ombre
     ctx.fillStyle = `rgba(0,0,0,${alpha * 0.7})`;
     ctx.fillText("-" + dn.value, x + 2, y + 2);
 
-    // Texte
     ctx.fillStyle = dn.color;
     ctx.globalAlpha = alpha;
     ctx.fillText("-" + dn.value, x, y);
@@ -1554,7 +1518,6 @@ function drawDamageNumbers() {
   });
 }
 
-/* ---------- Bouclier brisé ---------- */
 function updateShieldBreakFx() {
   for (let i = shieldBreakFx.length - 1; i >= 0; i--) {
     shieldBreakFx[i].life--;
@@ -1571,21 +1534,18 @@ function drawShieldBreakFx() {
     const alpha = Math.min(1, fx.life / 25);
     const radius = 30 + progress * 70;
 
-    // Anneau principal
     ctx.strokeStyle = `rgba(255, 221, 68, ${alpha})`;
     ctx.lineWidth = 5;
     ctx.beginPath();
     ctx.arc(x, y, radius, 0, Math.PI * 2);
     ctx.stroke();
 
-    // Anneau secondaire
     ctx.strokeStyle = `rgba(255, 200, 0, ${alpha * 0.6})`;
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.arc(x, y, radius * 0.7, 0, Math.PI * 2);
     ctx.stroke();
 
-    // Texte "BOUCLIER DÉTRUIT !"
     if (fx.life > 20) {
       const textAlpha = (fx.life - 20) / 30;
       ctx.font = "bold 16px Segoe UI, Arial";
@@ -1596,7 +1556,6 @@ function drawShieldBreakFx() {
       ctx.fillText("BOUCLIER DÉTRUIT !", x, y - radius - 10);
     }
 
-    // Éclats
     const shardCount = 6;
     for (let i = 0; i < shardCount; i++) {
       const a = (i / shardCount) * Math.PI * 2 + progress * 3;
@@ -1611,7 +1570,6 @@ function drawShieldBreakFx() {
   });
 }
 
-/* ---------- Scoreboard ---------- */
 function drawScoreboard() {
   const el = $("scoreboard");
   const list = Object.values(serverState.players);
@@ -1637,7 +1595,6 @@ function drawScoreboard() {
     (extra > 0 ? `<div style="color:#89a;font-size:11px">+ ${extra} autres…</div>` : "");
 }
 
-/* ---------- Compteur de survivants ---------- */
 function drawAliveCounter() {
   const el = $("aliveCounter");
   if (!el) return;
@@ -1648,7 +1605,6 @@ function drawAliveCounter() {
   el.textContent = `${alive} / ${total} SURVIVANT${alive > 1 ? "S" : ""}`;
 }
 
-/* ---------- Mini-map ---------- */
 function drawMinimap() {
   const size = minimap.width;
   const scale = size / 4500;
@@ -1658,13 +1614,11 @@ function drawMinimap() {
   mmCtx.fillRect(0, 0, size, size);
 
   if (serverState.mapData) {
-    // Murs
     mmCtx.fillStyle = "rgba(150, 150, 180, 0.4)";
     serverState.mapData.walls.forEach(w => {
       mmCtx.fillRect(w.x * scale, w.y * scale, w.w * scale, w.h * scale);
     });
 
-    // Rivières
     mmCtx.strokeStyle = "rgba(80, 140, 220, 0.6)";
     mmCtx.lineWidth = 2;
     serverState.mapData.rivers.forEach(r => {
@@ -1678,7 +1632,6 @@ function drawMinimap() {
     });
   }
 
-  // Le joueur (uniquement soi-même)
   const me = serverState.players[myId];
   if (me && me.alive) {
     mmCtx.fillStyle = "#4af";

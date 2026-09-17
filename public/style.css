@@ -1,6 +1,6 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body {
-  height: 100%;
+  height: 100%; width: 100%;
   font-family: 'Segoe UI', system-ui, Arial, sans-serif;
   background: #03040d;
   color: #fff;
@@ -89,7 +89,9 @@ html, body {
 .device-badge.mobile { border-color: #f4a; box-shadow: 0 0 30px rgba(255,68,170,0.5); color: #ffe8f4; }
 #deviceIcon { font-size: 18px; }
 
-/* PROFILES */
+/* ============================================================
+   PROFILES — Base (desktop)
+   ============================================================ */
 .profiles-screen { background: radial-gradient(circle at center, #0d1a3a, #03040d); overflow: hidden; }
 #profilesCanvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .profiles-header { position: relative; z-index: 1; text-align: center; padding: 14px 24px 4px; }
@@ -298,7 +300,9 @@ body.device-tablet #touchControls { display: block; }
 .skin-option.selected { border-color: #4af; box-shadow: 0 0 16px rgba(68,170,255,0.4); }
 .modal-content .btn { min-width: auto; margin-top: 16px; }
 
-/* RESPONSIVE */
+/* ============================================================
+   RESPONSIVE — TABLETTE
+   ============================================================ */
 @media (max-width: 1024px) {
   .menu-title { font-size: 26px; letter-spacing: 3px; }
   .btn-huge { font-size: 20px !important; padding: 22px 60px !important; min-width: 300px !important; }
@@ -306,21 +310,76 @@ body.device-tablet #touchControls { display: block; }
   .logo-img { width: 36px; height: 36px; }
   #scoreboard { font-size: 11px; padding: 8px 12px; min-width: 130px; }
   #minimap { width: 140px !important; height: 140px !important; }
-  .profiles-content { flex-direction: column; }
-  .account-right { width: 100%; max-height: 40vh; }
-  .selected-preview canvas { max-width: 80px; max-height: 80px; }
-  .preview-skins { grid-template-columns: repeat(6, 1fr); }
+
+  .profiles-content {
+    flex-direction: column;
+    padding: 4px 12px 8px;
+    gap: 8px;
+  }
+  .account-list {
+    min-height: 90px;
+    max-height: 130px;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 8px;
+  }
+  .account-card { padding: 8px 6px; }
+  .account-card canvas { max-width: 45px; max-height: 45px; margin-bottom: 2px; }
+  .account-card .name { font-size: 11px; }
+  .account-card .real { font-size: 9px; }
+
+  .account-right { width: 100%; max-height: 55vh; overflow-y: auto; }
+  .selected-preview { padding: 8px 10px; gap: 2px; }
+  .selected-preview canvas { max-width: 70px; max-height: 70px; margin-bottom: 2px; }
+  .preview-pseudo { font-size: 15px; }
+  .preview-real { font-size: 10px; }
+  .preview-skins-label { font-size: 8px; margin-top: 4px; margin-bottom: 2px; }
+  .preview-skins { grid-template-columns: repeat(6, 1fr); gap: 3px; margin-bottom: 6px; }
+  .selected-preview .btn { padding: 10px; font-size: 13px; }
 }
+
+/* ============================================================
+   RESPONSIVE — MOBILE
+   ============================================================ */
 @media (max-width: 768px) {
   .menu-title { font-size: 20px; letter-spacing: 2px; }
   .menu-sub { font-size: 11px; }
   .btn-huge { font-size: 16px !important; padding: 18px 40px !important; min-width: 240px !important; letter-spacing: 4px !important; }
+
   .login-box { padding: 24px 20px; min-width: auto; width: 92vw; }
   .login-logo { width: 100px; }
   .login-box h1 { font-size: 15px; letter-spacing: 3px; }
-  .profiles-header h1 { font-size: 14px; letter-spacing: 3px; }
-  .mini-logo { width: 40px; }
-  .account-list { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+
+  .profiles-header { padding: 8px 16px 2px; }
+  .profiles-header h1 { font-size: 12px; letter-spacing: 2px; }
+  .profiles-header p { font-size: 10px; margin-top: 2px; }
+  .mini-logo { width: 32px; }
+
+  .profiles-content { padding: 2px 8px 6px; gap: 6px; }
+  .account-list {
+    min-height: 70px;
+    max-height: 100px;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 6px;
+  }
+  .account-card { padding: 6px 4px; border-radius: 8px; }
+  .account-card canvas { max-width: 35px; max-height: 35px; margin-bottom: 2px; }
+  .account-card .name { font-size: 10px; }
+  .account-card .real { font-size: 8px; }
+  .account-card .delete-btn { width: 18px; height: 18px; font-size: 10px; top: 3px; right: 3px; }
+
+  .account-right { max-height: 48vh; }
+  .selected-preview { padding: 6px 8px; border-radius: 10px; }
+  .selected-preview canvas { max-width: 55px; max-height: 55px; }
+  .preview-pseudo { font-size: 13px; letter-spacing: 1px; }
+  .preview-real { font-size: 9px; }
+  .preview-skins-label { font-size: 7px; letter-spacing: 2px; }
+  .preview-skins { gap: 2px; margin-bottom: 4px; }
+  .preview-skins canvas { border-radius: 4px; }
+  .selected-preview .btn { padding: 8px; font-size: 11px; letter-spacing: 1px; }
+
+  .profiles-footer { padding: 6px; }
+  .profiles-footer .btn { padding: 10px 20px; font-size: 12px; min-width: 180px; }
+
   .browser-tabs { overflow-x: auto; }
   .tab-btn { padding: 10px 16px; font-size: 12px; letter-spacing: 1px; }
   .room-item { padding: 12px; flex-direction: column; gap: 10px; align-items: stretch; }
@@ -337,6 +396,44 @@ body.device-tablet #touchControls { display: block; }
   .victory-content h1 { font-size: 40px; letter-spacing: 6px; }
   .victory-trophy { font-size: 60px; }
 }
+
+/* ============================================================
+   PORTRAIT MOBILE — profil en 2 colonnes
+   ============================================================ */
+@media (max-width: 768px) and (orientation: portrait) {
+  .profiles-content {
+    flex-direction: row;
+    gap: 8px;
+    padding: 4px 8px 6px;
+    flex: 1;
+    min-height: 0;
+  }
+  .account-list {
+    flex: 1;
+    min-height: 0;
+    max-height: none;
+    grid-template-columns: 1fr;
+    gap: 6px;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+  .account-right {
+    width: 52%;
+    max-height: none;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+  .selected-preview {
+    padding: 6px;
+    gap: 2px;
+  }
+  .selected-preview canvas { max-width: 70px; max-height: 70px; }
+  .preview-skins { grid-template-columns: repeat(3, 1fr); gap: 3px; }
+  .preview-skins canvas { padding: 0; }
+  .selected-preview .btn { padding: 8px; font-size: 11px; }
+}
+
+/* Petits écrans paysage (téléphone tourné) */
 @media (max-height: 500px) {
   .joystick { width: 120px; height: 120px; bottom: 12px; }
   .joystick-move { left: 16px; }
@@ -344,6 +441,30 @@ body.device-tablet #touchControls { display: block; }
   .joystick-ring { width: 100px; height: 100px; }
   .joystick-knob { width: 48px; height: 48px; }
   .joystick-label { font-size: 9px; }
+
+  .profiles-header { padding: 4px 12px 2px; }
+  .mini-logo { width: 28px; }
+  .profiles-header h1 { font-size: 11px; }
+  .profiles-header p { display: none; }
+
+  .account-list {
+    min-height: 60px;
+    max-height: 80px;
+  }
+  .account-card { padding: 4px 6px; }
+  .account-card canvas { max-width: 32px; max-height: 32px; }
+  .account-card .name { font-size: 10px; }
+  .account-card .real { display: none; }
+
+  .selected-preview canvas { max-width: 50px; max-height: 50px; }
+  .preview-pseudo { font-size: 12px; }
+  .preview-real { display: none; }
+  .preview-skins-label { display: none; }
+  .preview-skins { gap: 2px; margin-bottom: 2px; }
+  .selected-preview .btn { padding: 6px; font-size: 10px; }
+
+  .profiles-footer { padding: 4px; }
+  .profiles-footer .btn { padding: 8px 16px; font-size: 11px; min-width: 140px; }
 }
 
 ::-webkit-scrollbar { width: 8px; }
