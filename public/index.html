@@ -2,13 +2,28 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <title>Stellar Game</title>
   <link rel="icon" type="image/png" href="assets/stellar.png">
   <link rel="apple-touch-icon" href="assets/stellar.png">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
+<!-- LANDSCAPE WARNING -->
+<div id="landscapeWarning" class="landscape-warning hidden">
+  <div class="rotate-phone">
+    <div class="phone-icon">📱</div>
+    <div class="rotate-arrow">↻</div>
+  </div>
+  <h1>TOURNE TON TÉLÉPHONE</h1>
+  <p>Le jeu se joue en <strong>MODE PAYSAGE</strong></p>
+  <div class="rotate-hint">
+    <span>→</span><span>→</span><span>→</span>
+  </div>
+</div>
 
 <!-- SPLASH -->
 <div id="splashScreen" class="screen splash-screen">
@@ -167,6 +182,7 @@
 <!-- GAME -->
 <div id="gameScreen" class="screen hidden">
   <canvas id="game"></canvas>
+
   <div id="hud">
     <button id="leaveGameBtn" class="icon-btn" title="Retour au salon">←</button>
     <div id="aliveCounter" class="alive-counter"></div>
@@ -185,13 +201,17 @@
   </div>
 
   <div id="touchControls" class="touch-controls hidden">
-    <div id="joystickZone" class="joystick-zone">
-      <div id="joystickBase" class="joystick-base hidden">
-        <div id="joystickKnob" class="joystick-knob"></div>
+    <div id="moveJoystick" class="joystick joystick-move">
+      <div class="joystick-label">DÉPLACER</div>
+      <div class="joystick-ring">
+        <div id="moveKnob" class="joystick-knob"></div>
       </div>
     </div>
-    <div id="shootZone" class="shoot-zone">
-      <div id="shootBtn" class="shoot-btn hidden">🔴</div>
+    <div id="aimJoystick" class="joystick joystick-aim">
+      <div class="joystick-label">VISER · TIRER</div>
+      <div class="joystick-ring">
+        <div id="aimKnob" class="joystick-knob"></div>
+      </div>
     </div>
   </div>
 

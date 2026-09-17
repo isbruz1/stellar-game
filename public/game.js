@@ -1,74 +1,85 @@
 /* ==================================================================
-   STELLAR GAME — Client V6 (Universal)
-   Support : PC / Mobile / Xbox / PlayStation / Steam Deck
+   STELLAR GAME — Client V7 (Universal + Landscape + Dual Joysticks)
    ================================================================== */
 
 // ==================================================================
 //  DÉTECTION APPAREIL
 // ==================================================================
 const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
-const userAgent = navigator.userAgent.toLowerCase();
-
-let deviceType = "desktop"; // desktop | mobile | tablet | console
-let gamepadType = null;     // xbox | playstation | generic
+let deviceType = "desktop";
+let gamepadType = null;
 let hasGamepad = false;
 
 function detectDevice() {
-  // Détection console / manette branchée
   const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
   for (const gp of gamepads) {
-    if (gp) {
-      hasGamepad = true;
-      gamepadType = detectGamepadType(gp.id);
-      break;
-    }
+    if (gp) { hasGamepad = true; gamepadType = detectGamepadType(gp.id); break; }
   }
-
-  // Détection type d'appareil
-  if (hasGamepad) {
-    deviceType = "console";
-  } else if (isTouchDevice) {
-    deviceType = window.innerWidth >= 1024 ? "tablet" : "mobile";
-  } else {
-    deviceType = "desktop";
-  }
-
+  if (hasGamepad) deviceType = "console";
+  else if (isTouchDevice) deviceType = window.innerWidth >= 1024 ? "tablet" : "mobile";
+  else deviceType = "desktop";
   return { deviceType, gamepadType, hasGamepad };
 }
 
 function detectGamepadType(id) {
   const s = (id || "").toLowerCase();
   if (s.includes("xbox") || s.includes("xinput")) return "xbox";
-  if (s.includes("playstation") || s.includes("dualshock") ||
-      s.includes("dualsense") || s.includes("sony")) return "playstation";
+  if (s.includes("playstation") || s.includes("dualshock") || s.includes("dualsense") || s.includes("sony")) return "playstation";
   if (s.includes("steam")) return "steam";
   if (s.includes("nintendo") || s.includes("switch") || s.includes("joy-con")) return "nintendo";
   return "generic";
 }
 
-// Application au body
 function applyDeviceClass() {
-  document.body.className = document.body.className
-    .split(" ").filter(c => !c.startsWith("device-")).join(" ");
+  document.body.className = document.body.className.split(" ").filter(c => !c.startsWith("device-")).join(" ");
   document.body.classList.add("device-" + deviceType);
 }
 
 // ==================================================================
-//  BADGE DE DÉTECTION (écran splash)
+//  LANDSCAPE & FULLSCREEN
+// ==================================================================
+let isFullscreen = false;
+
+function checkLandscape() {
+  const el = document.getElementById("landscapeWarning");
+  if (!el) return;
+  const isPortrait = window.innerHeight > window.innerWidth;
+  const isMobileOrTablet = deviceType === "mobile" || deviceType === "tablet";
+  if (isPortrait && isMobileOrTablet) el.classList.remove("hidden");
+  else el.classList.add("hidden");
+}
+
+async function requestFullscreen() {
+  if (deviceType !== "mobile" && deviceType !== "tablet") return;
+  if (isFullscreen) return;
+  try {
+    const el = document.documentElement;
+    if (el.requestFullscreen) await el.requestFullscreen();
+    else if (el.webkitRequestFullscreen) await el.webkitRequestFullscreen();
+    isFullscreen = true;
+    if (screen.orientation && screen.orientation.lock) {
+      try { await screen.orientation.lock("landscape"); } catch(e) {}
+    }
+  } catch (e) {}
+}
+
+window.addEventListener("resize", checkLandscape);
+window.addEventListener("orientationchange", () => setTimeout(checkLandscape, 150));
+document.addEventListener("touchstart", () => requestFullscreen(), { once: true });
+document.addEventListener("click", () => requestFullscreen(), { once: true });
+
+// ==================================================================
+//  BADGE DÉTECTION
 // ==================================================================
 function updateDeviceBadge() {
   const badge = document.getElementById("deviceBadge");
   const icon = document.getElementById("deviceIcon");
   const label = document.getElementById("deviceLabel");
-  if (!badge || !icon || !label) return;
-
+  if (!badge) return;
   badge.className = "device-badge detected";
-
   if (deviceType === "console") {
     badge.classList.add("gamepad");
-    icon.textContent = gamepadType === "playstation" ? "🎮" :
-                       gamepadType === "xbox" ? "🎮" :
-                       gamepadType === "nintendo" ? "🎮" : "🎮";
+    icon.textContent = "🎮";
     const name = gamepadType === "xbox" ? "XBOX" :
                  gamepadType === "playstation" ? "PLAYSTATION" :
                  gamepadType === "nintendo" ? "NINTENDO" :
@@ -88,62 +99,36 @@ function updateDeviceBadge() {
   }
 }
 
-// Mise à jour du texte d'aide dans le menu
 function updateControlsHint() {
   const hint = document.getElementById("controlsHint");
   if (!hint) return;
-
   if (deviceType === "console") {
     const shootKey = gamepadType === "playstation" ? "R2" : "RT";
-    const aimKey = gamepadType === "playstation" ? "STICK D." : "STICK D.";
-    hint.innerHTML = `
-      <span class="ctrl-key">STICK G.</span> bouger
-      <span class="ctrl-key">${aimKey}</span> viser
-      <span class="ctrl-key">${shootKey}</span> tirer
-    `;
+    hint.innerHTML = `<span class="ctrl-key">STICK G.</span> bouger <span class="ctrl-key">STICK D.</span> viser <span class="ctrl-key">${shootKey}</span> tirer`;
   } else if (deviceType === "mobile" || deviceType === "tablet") {
-    hint.innerHTML = `
-      <span class="ctrl-key">👈 JOYSTICK</span> bouger
-      <span class="ctrl-key">👉 TAP</span> tirer
-    `;
+    hint.innerHTML = `<span class="ctrl-key" style="border-color:#4af;color:#9cf">🔵 GAUCHE</span> bouger <span class="ctrl-key" style="border-color:#f55;color:#faa">🔴 DROITE</span> viser + tirer`;
   } else {
-    hint.innerHTML = `
-      <span class="ctrl-key">ZQSD</span> bouger
-      <span class="ctrl-key">SOURIS</span> viser
-      <span class="ctrl-key">CLIC</span> tirer
-    `;
+    hint.innerHTML = `<span class="ctrl-key">ZQSD</span> bouger <span class="ctrl-key">SOURIS</span> viser <span class="ctrl-key">CLIC</span> tirer`;
   }
 }
 
-// Détection initiale
 detectDevice();
 applyDeviceClass();
 updateControlsHint();
 
-// Détection en direct (manette branchée/débranchée)
 window.addEventListener("gamepadconnected", e => {
-  console.log("🎮 Manette connectée :", e.gamepad.id);
-  detectDevice();
-  applyDeviceClass();
-  updateControlsHint();
-  updateDeviceBadge();
+  detectDevice(); applyDeviceClass(); updateControlsHint(); updateDeviceBadge();
 });
-window.addEventListener("gamepaddisconnected", e => {
-  console.log("🎮 Manette déconnectée");
-  detectDevice();
-  applyDeviceClass();
-  updateControlsHint();
+window.addEventListener("gamepaddisconnected", () => {
+  detectDevice(); applyDeviceClass(); updateControlsHint();
 });
-
-// Changement de taille (rotation, resize)
 window.addEventListener("resize", () => {
-  const newType = !hasGamepad && isTouchDevice
-    ? (window.innerWidth >= 1024 ? "tablet" : "mobile")
-    : (hasGamepad ? "console" : "desktop");
+  const newType = hasGamepad ? "console" : (isTouchDevice ? (window.innerWidth >= 1024 ? "tablet" : "mobile") : "desktop");
   if (newType !== deviceType) {
     deviceType = newType;
     applyDeviceClass();
     updateControlsHint();
+    checkLandscape();
   }
 });
 
@@ -257,6 +242,7 @@ function showScreen(name) {
   };
   if (map[name]) map[name].classList.remove("hidden");
   if (name === "game") resizeCanvas();
+  checkLandscape();
 }
 
 // ==================================================================
@@ -277,9 +263,8 @@ function connectSocket() {
   });
 
   socket.on("claim-result", res => {
-    if (res.ok) {
-      enterMenuWithAccount();
-    } else {
+    if (res.ok) enterMenuWithAccount();
+    else {
       alert("❌ " + res.reason);
       releaseAccount();
       showScreen("profiles");
@@ -298,10 +283,8 @@ function connectSocket() {
     roomCodeDisplay.textContent = data.id;
     roomNameDisplay.textContent = "— " + data.name;
     socket.emit("join-room", {
-      id: data.id,
-      pseudo: currentAccount.pseudo,
-      realName: currentAccount.realName,
-      skin: currentAccount.skin || 0
+      id: data.id, pseudo: currentAccount.pseudo,
+      realName: currentAccount.realName, skin: currentAccount.skin || 0
     });
   });
 
@@ -343,6 +326,7 @@ function connectSocket() {
     $("spectatePanel").classList.add("hidden");
     $("victoryScreen").classList.add("hidden");
     keys.up = keys.down = keys.left = keys.right = false;
+    requestFullscreen();
   });
 
   socket.on("game-ended", () => { gameStarted = false; });
@@ -358,16 +342,14 @@ function connectSocket() {
     if (data.shieldDamage > 0) {
       damageNumbers.push({
         x: data.x + (Math.random() - 0.5) * 30,
-        y: data.y - 30,
-        value: Math.round(data.shieldDamage),
+        y: data.y - 30, value: Math.round(data.shieldDamage),
         color: "#4af", life: 60, vy: -1.2
       });
     }
     if (data.hpDamage > 0) {
       damageNumbers.push({
         x: data.x + (Math.random() - 0.5) * 30,
-        y: data.y - 50,
-        value: Math.round(data.hpDamage),
+        y: data.y - 50, value: Math.round(data.hpDamage),
         color: "#fff", life: 60, vy: -1.4
       });
     }
@@ -436,7 +418,6 @@ function initStarfield(canvasId, opacity = 0.5) {
   })();
 }
 
-// Splash galaxy
 (function initGalaxy() {
   const c = $("galaxyCanvas");
   const g = c.getContext("2d");
@@ -444,7 +425,6 @@ function initStarfield(canvasId, opacity = 0.5) {
   function resize() { c.width = window.innerWidth; c.height = window.innerHeight; }
   resize();
   window.addEventListener("resize", resize);
-
   const galaxy = [];
   for (let i = 0; i < 600; i++) {
     const armAngle = (Math.floor(Math.random() * 2) / 2) * Math.PI * 2;
@@ -495,23 +475,18 @@ function initStarfield(canvasId, opacity = 0.5) {
 //  FLOW DÉMARRAGE
 // ==================================================================
 showScreen("splash");
+checkLandscape();
 
-// Détection manette en continu pendant le splash
 const detectInterval = setInterval(() => {
   const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
   let found = false;
   for (const gp of gamepads) if (gp) { found = true; break; }
   if (found !== hasGamepad) {
-    detectDevice();
-    applyDeviceClass();
-    updateControlsHint();
+    detectDevice(); applyDeviceClass(); updateControlsHint();
   }
 }, 500);
 
-setTimeout(() => {
-  clearInterval(detectInterval);
-  updateDeviceBadge();
-}, 1500);
+setTimeout(() => { clearInterval(detectInterval); updateDeviceBadge(); }, 1500);
 
 setTimeout(() => {
   window.__stopGalaxy && window.__stopGalaxy();
@@ -537,7 +512,6 @@ function renderAccounts() {
     previewSkinPicker.innerHTML = "";
     return;
   }
-
   accounts.forEach((acc, idx) => {
     const card = document.createElement("div");
     card.className = "account-card";
@@ -602,7 +576,6 @@ function previewAccount(acc) {
   previewPseudo.textContent = acc.pseudo;
   previewReal.textContent = acc.realName || "";
   drawPreviewTank(acc.skin || 0);
-
   previewSkinPicker.innerHTML = "";
   SKINS.forEach((s, i) => {
     const c = document.createElement("canvas");
@@ -618,7 +591,6 @@ function previewAccount(acc) {
     });
     previewSkinPicker.appendChild(c);
   });
-
   const locked = isAccountLocked(acc.pseudo);
   enterLobbyBtn.disabled = locked;
   enterLobbyBtn.textContent = locked ? "🔒 EN UTILISATION" : "JOUER";
@@ -677,8 +649,7 @@ function validateNewAccount() {
     pseudoError.textContent = "Ce pseudo est déjà utilisé ailleurs.";
   else pseudoError.textContent = "";
   nextToSkinBtn.disabled = !(p.length >= 5 && p.length <= 16 && r.length > 0 &&
-    !accounts.some(a => a.pseudo.toLowerCase() === p.toLowerCase()) &&
-    !isAccountLocked(p));
+    !accounts.some(a => a.pseudo.toLowerCase() === p.toLowerCase()) && !isAccountLocked(p));
 }
 pseudoInput.addEventListener("input", validateNewAccount);
 realNameInput.addEventListener("input", validateNewAccount);
@@ -763,10 +734,8 @@ joinByCodeBtn.addEventListener("click", () => {
   if (code.length !== 5) return alert("Code à 5 caractères.");
   if (!socket) return;
   socket.emit("join-room", {
-    id: code,
-    pseudo: currentAccount.pseudo,
-    realName: currentAccount.realName,
-    skin: currentAccount.skin || 0
+    id: code, pseudo: currentAccount.pseudo,
+    realName: currentAccount.realName, skin: currentAccount.skin || 0
   });
 });
 
@@ -901,9 +870,7 @@ $("leaveGameBtn").addEventListener("click", () => {
 $("backToLobbyBtn").addEventListener("click", () => {
   if (!socket) return;
   socket.emit("leave-game");
-  dead = false;
-  spectating = null;
-  gameStarted = false;
+  dead = false; spectating = null; gameStarted = false;
   $("deathScreen").classList.add("hidden");
   $("spectatePanel").classList.add("hidden");
   showScreen("lobby");
@@ -946,9 +913,7 @@ $("returnToServerBtn").addEventListener("click", () => {
   $("victoryScreen").classList.add("hidden");
   $("deathScreen").classList.add("hidden");
   $("spectatePanel").classList.add("hidden");
-  gameStarted = false;
-  dead = false;
-  spectating = null;
+  gameStarted = false; dead = false; spectating = null;
   showScreen("lobby");
 });
 
@@ -978,7 +943,7 @@ window.addEventListener("keyup", e => {
 //  SOURIS (PC)
 // ==================================================================
 canvas.addEventListener("mousemove", e => {
-  if (deviceType === "mobile" || deviceType === "tablet" || deviceType === "console") return;
+  if (deviceType !== "desktop") return;
   const rect = canvas.getBoundingClientRect();
   const cam = getCamera();
   const me = serverState.players[myId];
@@ -988,7 +953,7 @@ canvas.addEventListener("mousemove", e => {
   myAngle = Math.atan2(wy - me.y, wx - me.x);
 });
 canvas.addEventListener("mousedown", e => {
-  if (deviceType === "mobile" || deviceType === "tablet" || deviceType === "console") return;
+  if (deviceType !== "desktop") return;
   if (e.button !== 0 || !gameStarted || !myId || !socket) return;
   const me = serverState.players[myId];
   if (!me || !me.alive) return;
@@ -996,130 +961,176 @@ canvas.addEventListener("mousedown", e => {
 });
 
 // ==================================================================
-//  CONTRÔLES TACTILES (MOBILE / TABLETTE)
+//  CONTRÔLES TACTILES — 2 JOYSTICKS FIXES
 // ==================================================================
 const touchControls = $("touchControls");
-const joystickZone = $("joystickZone");
-const joystickBase = $("joystickBase");
-const joystickKnob = $("joystickKnob");
-const shootZone = $("shootZone");
-const shootBtn = $("shootBtn");
+const moveJoystick = $("moveJoystick");
+const moveKnob = $("moveKnob");
+const aimJoystick = $("aimJoystick");
+const aimKnob = $("aimKnob");
 
-let joyActive = false, joyTouchId = null;
-let joyOriginX = 0, joyOriginY = 0;
+const moveJoyState = { active: false, touchId: null, baseX: 0, baseY: 0, dx: 0, dy: 0 };
+const aimJoyState  = { active: false, touchId: null, baseX: 0, baseY: 0, dx: 0, dy: 0 };
+
+const KNOB_RADIUS = 35;
+const DEADZONE = 0.25;
 
 if (deviceType === "mobile" || deviceType === "tablet") {
   touchControls.classList.remove("hidden");
 }
 
-joystickZone.addEventListener("touchstart", e => {
+function getJoystickCenter(el) {
+  const rect = el.querySelector(".joystick-ring").getBoundingClientRect();
+  return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+}
+function updateKnob(el, dx, dy) {
+  el.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+}
+function resetKnob(el) {
+  el.style.transform = "translate(-50%, -50%)";
+}
+
+// MOVE (bleu)
+moveJoystick.addEventListener("touchstart", e => {
   if (!gameStarted || dead) return;
   e.preventDefault();
   const t = e.changedTouches[0];
-  joyTouchId = t.identifier;
-  joyActive = true;
-  joyOriginX = t.clientX;
-  joyOriginY = t.clientY;
-  joystickBase.style.left = joyOriginX + "px";
-  joystickBase.style.top = joyOriginY + "px";
-  joystickBase.classList.remove("hidden");
-  joystickKnob.style.left = "50%";
-  joystickKnob.style.top = "50%";
+  moveJoyState.active = true;
+  moveJoyState.touchId = t.identifier;
+  const c = getJoystickCenter(moveJoystick);
+  moveJoyState.baseX = c.x;
+  moveJoyState.baseY = c.y;
+  moveJoystick.classList.add("active");
 }, { passive: false });
 
-joystickZone.addEventListener("touchmove", e => {
-  if (!joyActive) return;
+moveJoystick.addEventListener("touchmove", e => {
+  if (!moveJoyState.active) return;
   e.preventDefault();
-  const t = Array.from(e.changedTouches).find(x => x.identifier === joyTouchId);
+  const t = Array.from(e.changedTouches).find(x => x.identifier === moveJoyState.touchId);
   if (!t) return;
-  const dx = t.clientX - joyOriginX;
-  const dy = t.clientY - joyOriginY;
+  let dx = t.clientX - moveJoyState.baseX;
+  let dy = t.clientY - moveJoyState.baseY;
   const dist = Math.hypot(dx, dy);
-  const maxDist = 55;
-  const norm = dist > maxDist ? maxDist / dist : 1;
-  const nx = dx * norm;
-  const ny = dy * norm;
-  joystickKnob.style.left = `calc(50% + ${nx}px)`;
-  joystickKnob.style.top = `calc(50% + ${ny}px)`;
+  const norm = dist > KNOB_RADIUS ? KNOB_RADIUS / dist : 1;
+  dx *= norm; dy *= norm;
+  moveJoyState.dx = dx;
+  moveJoyState.dy = dy;
+  updateKnob(moveKnob, dx, dy);
 
-  const deadzone = maxDist * 0.2;
-  if (dist < deadzone) {
+  const nx = dx / KNOB_RADIUS;
+  const ny = dy / KNOB_RADIUS;
+  const mag = Math.hypot(nx, ny);
+  if (mag < DEADZONE) {
     keys.up = keys.down = keys.left = keys.right = false;
     return;
   }
-
-  const angle = Math.atan2(ny, nx);
-  keys.right = angle > -Math.PI * 0.75 && angle < Math.PI * 0.75;
-  keys.left  = angle > Math.PI * 0.75 || angle < -Math.PI * 0.75;
-  keys.down  = angle > Math.PI * 0.25 && angle < Math.PI * 0.75;
-  keys.up    = angle > -Math.PI * 0.75 && angle < -Math.PI * 0.25;
-  myAngle = angle;
+  keys.right = nx >  0.35;
+  keys.left  = nx < -0.35;
+  keys.down  = ny >  0.35;
+  keys.up    = ny < -0.35;
 }, { passive: false });
 
-function endJoystick(e) {
-  const t = Array.from(e.changedTouches).find(x => x.identifier === joyTouchId);
+function endMoveJoystick(e) {
+  const t = Array.from(e.changedTouches).find(x => x.identifier === moveJoyState.touchId);
   if (!t) return;
-  joyActive = false;
-  joyTouchId = null;
+  moveJoyState.active = false;
+  moveJoyState.touchId = null;
+  moveJoyState.dx = 0;
+  moveJoyState.dy = 0;
   keys.up = keys.down = keys.left = keys.right = false;
-  joystickBase.classList.add("hidden");
+  moveJoystick.classList.remove("active");
+  resetKnob(moveKnob);
 }
-joystickZone.addEventListener("touchend", endJoystick);
-joystickZone.addEventListener("touchcancel", endJoystick);
+moveJoystick.addEventListener("touchend", endMoveJoystick);
+moveJoystick.addEventListener("touchcancel", endMoveJoystick);
 
-shootZone.addEventListener("touchstart", e => {
-  if (!gameStarted || dead || !socket) return;
+// AIM (rouge)
+aimJoystick.addEventListener("touchstart", e => {
+  if (!gameStarted || dead) return;
   e.preventDefault();
   const t = e.changedTouches[0];
-  shootBtn.style.left = t.clientX + "px";
-  shootBtn.style.top = t.clientY + "px";
-  shootBtn.classList.remove("hidden");
-  const me = serverState.players[myId];
-  if (me && me.alive) socket.emit("shoot", { angle: myAngle });
+  aimJoyState.active = true;
+  aimJoyState.touchId = t.identifier;
+  const c = getJoystickCenter(aimJoystick);
+  aimJoyState.baseX = c.x;
+  aimJoyState.baseY = c.y;
+  aimJoystick.classList.add("active");
 }, { passive: false });
 
-shootZone.addEventListener("touchend", () => shootBtn.classList.add("hidden"));
-shootZone.addEventListener("touchcancel", () => shootBtn.classList.add("hidden"));
+aimJoystick.addEventListener("touchmove", e => {
+  if (!aimJoyState.active) return;
+  e.preventDefault();
+  const t = Array.from(e.changedTouches).find(x => x.identifier === aimJoyState.touchId);
+  if (!t) return;
+  let dx = t.clientX - aimJoyState.baseX;
+  let dy = t.clientY - aimJoyState.baseY;
+  const dist = Math.hypot(dx, dy);
+  const norm = dist > KNOB_RADIUS ? KNOB_RADIUS / dist : 1;
+  dx *= norm; dy *= norm;
+  aimJoyState.dx = dx;
+  aimJoyState.dy = dy;
+  updateKnob(aimKnob, dx, dy);
+
+  const mag = Math.hypot(dx, dy) / KNOB_RADIUS;
+  if (mag < DEADZONE) return;
+  myAngle = Math.atan2(dy, dx);
+}, { passive: false });
+
+function endAimJoystick(e) {
+  const t = Array.from(e.changedTouches).find(x => x.identifier === aimJoyState.touchId);
+  if (!t) return;
+  aimJoyState.active = false;
+  aimJoyState.touchId = null;
+  aimJoyState.dx = 0;
+  aimJoyState.dy = 0;
+  aimJoystick.classList.remove("active");
+  resetKnob(aimKnob);
+}
+aimJoystick.addEventListener("touchend", endAimJoystick);
+aimJoystick.addEventListener("touchcancel", endAimJoystick);
+
+// Tir automatique tant que le joystick rouge est actif
+let lastTouchShot = 0;
+setInterval(() => {
+  if (!aimJoyState.active) return;
+  if (!gameStarted || dead || !socket) return;
+  const mag = Math.hypot(aimJoyState.dx, aimJoyState.dy) / KNOB_RADIUS;
+  if (mag < DEADZONE) return;
+  const now = Date.now();
+  if (now - lastTouchShot < 400) return;
+  const me = serverState.players[myId];
+  if (me && me.alive) {
+    socket.emit("shoot", { angle: myAngle });
+    lastTouchShot = now;
+  }
+}, 50);
 
 // ==================================================================
-//  MANETTE (CONSOLE / PC)
+//  MANETTE
 // ==================================================================
-let gamepadShootCooldown = 0;
 let gamepadLastShot = 0;
 
 function pollGamepad() {
   const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
   let gp = null;
   for (const g of gamepads) if (g) { gp = g; break; }
-
   if (gp && gameStarted && !dead) {
     const now = Date.now();
-
-    // Joystick gauche → mouvement
     const lx = gp.axes[0] || 0;
     const ly = gp.axes[1] || 0;
     const deadzone = 0.25;
-
     keys.up    = ly < -deadzone;
     keys.down  = ly > deadzone;
     keys.left  = lx < -deadzone;
     keys.right = lx > deadzone;
 
-    // Joystick droit → visée
     const rx = gp.axes[2] || 0;
     const ry = gp.axes[3] || 0;
-    if (Math.hypot(rx, ry) > deadzone) {
-      myAngle = Math.atan2(ry, rx);
-    } else if (lx !== 0 || ly !== 0) {
-      // Si on bouge mais on ne vise pas → orienter vers le déplacement
-      if (Math.hypot(lx, ly) > deadzone) myAngle = Math.atan2(ly, lx);
-    }
+    if (Math.hypot(rx, ry) > deadzone) myAngle = Math.atan2(ry, rx);
+    else if (Math.hypot(lx, ly) > deadzone) myAngle = Math.atan2(ly, lx);
 
-    // Bouton tir : RT (Xbox) = button 7, R2 (PS) = button 7
-    // L2 (PS) = button 6, LT (Xbox) = button 6
     const rtPressed = gp.buttons[7] && gp.buttons[7].pressed;
     const ltPressed = gp.buttons[6] && gp.buttons[6].pressed;
-
     if ((rtPressed || ltPressed) && now - gamepadLastShot > 350) {
       const me = serverState.players[myId];
       if (me && me.alive && socket) {
@@ -1127,16 +1138,13 @@ function pollGamepad() {
         gamepadLastShot = now;
       }
     }
-
-    // Bouton A / X (button 0) → reload/action future
   }
-
   requestAnimationFrame(pollGamepad);
 }
 pollGamepad();
 
 // ==================================================================
-//  INPUT VERS LE SERVEUR
+//  INPUT vers serveur
 // ==================================================================
 setInterval(() => {
   if (!gameStarted || !myId || !socket) return;
@@ -1332,9 +1340,7 @@ function drawBullets() {
 function updateDamageNumbers() {
   for (let i = damageNumbers.length - 1; i >= 0; i--) {
     const dn = damageNumbers[i];
-    dn.y += dn.vy;
-    dn.vy *= 0.96;
-    dn.life--;
+    dn.y += dn.vy; dn.vy *= 0.96; dn.life--;
     if (dn.life <= 0) damageNumbers.splice(i, 1);
   }
 }
@@ -1403,8 +1409,7 @@ function drawScoreboard() {
     if (a.alive !== b.alive) return a.alive ? -1 : 1;
     return a.pseudo.localeCompare(b.pseudo);
   });
-  const showAll = list.length <= 10;
-  const display = showAll ? list : list.slice(0, 10);
+  const display = list.length <= 10 ? list : list.slice(0, 10);
   const extra = list.length - display.length;
   el.innerHTML = display.map(p => {
     const c = p.alive ? (p.id === myId ? "#4af" : "#ddd") : "#666";

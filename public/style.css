@@ -9,7 +9,54 @@ html, body {
 .hidden { display: none !important; }
 .muted { color: #89a; }
 
-/* SPLASH */
+/* ============================================================
+   LANDSCAPE WARNING
+   ============================================================ */
+.landscape-warning {
+  position: fixed; inset: 0;
+  background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  z-index: 9999;
+  gap: 24px; padding: 32px; text-align: center;
+  animation: landscapeFadeIn 0.4s ease;
+}
+@keyframes landscapeFadeIn { from { opacity: 0; } to { opacity: 1; } }
+.rotate-phone { position: relative; width: 140px; height: 140px; }
+.phone-icon {
+  font-size: 100px; display: block;
+  animation: rotatePhone 2s ease-in-out infinite;
+  filter: drop-shadow(0 0 30px rgba(68,170,255,0.7));
+}
+@keyframes rotatePhone {
+  0%, 20%  { transform: rotate(0deg); }
+  50%, 80% { transform: rotate(90deg); }
+  100%     { transform: rotate(0deg); }
+}
+.rotate-arrow {
+  position: absolute; bottom: -10px; right: -10px;
+  font-size: 40px; color: #4af;
+  animation: spinArrow 2s linear infinite;
+}
+@keyframes spinArrow { to { transform: rotate(360deg); } }
+.landscape-warning h1 {
+  font-size: 24px; font-weight: 800; letter-spacing: 6px;
+  color: #4af; text-shadow: 0 0 30px rgba(68,170,255,0.7);
+}
+.landscape-warning p { color: #89a; font-size: 14px; letter-spacing: 2px; }
+.landscape-warning p strong { color: #fd4; }
+.rotate-hint { display: flex; gap: 8px; margin-top: 16px; }
+.rotate-hint span { font-size: 28px; color: #4af; animation: hintPulse 1.2s ease-in-out infinite; }
+.rotate-hint span:nth-child(2) { animation-delay: 0.2s; }
+.rotate-hint span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes hintPulse {
+  0%, 100% { opacity: 0.3; transform: translateX(0); }
+  50%      { opacity: 1; transform: translateX(6px); }
+}
+
+/* ============================================================
+   SPLASH
+   ============================================================ */
 .splash-screen { align-items: center; justify-content: center; background: #000; overflow: hidden; }
 #galaxyCanvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .splash-content { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 22px; }
@@ -19,8 +66,8 @@ html, body {
 @keyframes spin { to { transform: rotate(360deg); } }
 .splash-logo { width: 220px; object-fit: contain; filter: drop-shadow(0 0 50px rgba(68,170,255,0.9)); opacity: 0; transform: scale(0.4); animation: logoWarp 1.5s cubic-bezier(0.22,1,0.36,1) 0.3s forwards; }
 @keyframes logoWarp {
-  0% { opacity: 0; transform: scale(0.4) rotate(-10deg); filter: blur(24px); }
-  60% { opacity: 1; transform: scale(1.1) rotate(3deg); filter: blur(0); }
+  0%   { opacity: 0; transform: scale(0.4) rotate(-10deg); filter: blur(24px); }
+  60%  { opacity: 1; transform: scale(1.1) rotate(3deg); filter: blur(0); }
   100% { opacity: 1; transform: scale(1) rotate(0); filter: blur(0); }
 }
 .splash-title { font-size: 24px; font-weight: 800; letter-spacing: 12px; color: #cce8ff; text-shadow: 0 0 20px rgba(68,170,255,0.9); opacity: 0; animation: fadeUp 0.8s ease 1.2s forwards; }
@@ -199,25 +246,95 @@ input::placeholder { color: #556; }
 
 .alive-counter { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.6); border: 2px solid #4af; border-radius: 24px; padding: 8px 24px; font-size: 14px; font-weight: 800; letter-spacing: 3px; color: #cce8ff; text-shadow: 0 0 12px rgba(68,170,255,0.8); backdrop-filter: blur(6px); pointer-events: none; }
 
-/* TOUCH CONTROLS */
+/* ============================================================
+   TOUCH CONTROLS — 2 JOYSTICKS FIXES
+   ============================================================ */
 .touch-controls { position: fixed; inset: 0; pointer-events: none; z-index: 30; }
-body.device-desktop .touch-controls, body.device-console .touch-controls { display: none !important; }
-body.device-mobile #touchControls, body.device-tablet #touchControls { display: block; }
+body.device-desktop .touch-controls,
+body.device-console .touch-controls { display: none !important; }
+body.device-mobile #touchControls,
+body.device-tablet #touchControls { display: block; }
 
-.joystick-zone { position: absolute; left: 0; top: 0; bottom: 0; width: 50%; pointer-events: auto; touch-action: none; }
-.joystick-base { position: absolute; width: 130px; height: 130px; border-radius: 50%; border: 3px solid rgba(68,170,255,0.6); background: rgba(0,0,0,0.35); backdrop-filter: blur(4px); transform: translate(-50%, -50%); pointer-events: none; box-shadow: 0 0 24px rgba(68,170,255,0.5); }
-.joystick-knob { position: absolute; left: 50%; top: 50%; width: 60px; height: 60px; border-radius: 50%; background: radial-gradient(circle at 40% 40%, #4af, #1a3a6a); transform: translate(-50%, -50%); box-shadow: 0 0 20px rgba(68,170,255,0.9); border: 2px solid #9af; }
-.shoot-zone { position: absolute; right: 0; top: 0; bottom: 0; width: 50%; pointer-events: auto; touch-action: none; }
-.shoot-btn { position: absolute; width: 100px; height: 100px; border-radius: 50%; background: radial-gradient(circle at 40% 40%, #f55, #811); border: 3px solid #faa; display: flex; align-items: center; justify-content: center; font-size: 32px; transform: translate(-50%, -50%); box-shadow: 0 0 30px rgba(255,80,80,0.8); }
+.joystick {
+  position: absolute;
+  width: 160px;
+  height: 160px;
+  bottom: 20px;
+  pointer-events: auto;
+  touch-action: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.joystick-move { left: 24px; }
+.joystick-aim  { right: 24px; }
 
-/* DEATH */
+.joystick-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: rgba(255,255,255,0.5);
+  text-shadow: 0 0 6px rgba(0,0,0,0.8);
+  pointer-events: none;
+}
+.joystick-move .joystick-label { color: rgba(68,170,255,0.85); }
+.joystick-aim  .joystick-label { color: rgba(255,80,80,0.85); }
+
+.joystick-ring {
+  position: relative;
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  border: 3px solid rgba(255,255,255,0.3);
+  background: rgba(0,0,0,0.35);
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+  transition: all 0.15s ease;
+}
+.joystick-move .joystick-ring {
+  border-color: rgba(68,170,255,0.7);
+  box-shadow: 0 0 25px rgba(68,170,255,0.5), inset 0 0 20px rgba(68,170,255,0.15);
+}
+.joystick-aim .joystick-ring {
+  border-color: rgba(255,80,80,0.7);
+  box-shadow: 0 0 25px rgba(255,80,80,0.5), inset 0 0 20px rgba(255,80,80,0.15);
+}
+.joystick.active .joystick-ring { transform: scale(1.08); }
+.joystick-move.active .joystick-ring { box-shadow: 0 0 40px rgba(68,170,255,0.9), inset 0 0 30px rgba(68,170,255,0.25); }
+.joystick-aim.active .joystick-ring { box-shadow: 0 0 40px rgba(255,80,80,0.9), inset 0 0 30px rgba(255,80,80,0.25); }
+
+.joystick-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  transition: transform 0.05s linear;
+}
+.joystick-move .joystick-knob {
+  background: radial-gradient(circle at 40% 40%, #6cf, #1a3a6a);
+  border: 2px solid #9cf;
+  box-shadow: 0 0 20px rgba(68,170,255,0.9);
+}
+.joystick-aim .joystick-knob {
+  background: radial-gradient(circle at 40% 40%, #f88, #811);
+  border: 2px solid #faa;
+  box-shadow: 0 0 20px rgba(255,80,80,0.9);
+}
+
+/* ============================================================
+   DEATH / SPECTATE / VICTORY
+   ============================================================ */
 .death-screen { position: absolute; inset: 0; background: rgba(80, 0, 0, 0.55); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; z-index: 50; }
 .death-content { text-align: center; background: rgba(0,0,0,0.75); border: 2px solid #f55; border-radius: 20px; padding: 48px 64px; box-shadow: 0 0 80px rgba(255,50,50,0.5); }
 .death-content h1 { font-size: 52px; font-weight: 900; letter-spacing: 8px; color: #f55; text-shadow: 0 0 30px rgba(255,50,50,0.9); margin-bottom: 8px; }
 .death-sub { color: #89a; letter-spacing: 3px; font-size: 13px; margin-bottom: 32px; }
 .death-buttons { display: flex; flex-direction: column; gap: 12px; }
 
-/* SPECTATE */
 .spectate-panel { position: absolute; top: 16px; left: 16px; background: rgba(0,0,0,0.75); border: 2px solid #fd4; border-radius: 12px; padding: 16px; min-width: 260px; z-index: 40; }
 .spectate-title { font-size: 14px; font-weight: 800; letter-spacing: 3px; color: #fd4; margin-bottom: 12px; }
 .spectate-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; max-height: 200px; overflow-y: auto; }
@@ -225,7 +342,6 @@ body.device-mobile #touchControls, body.device-tablet #touchControls { display: 
 .spectate-item.active { background: rgba(255,221,68,0.15); border: 1px solid #fd4; }
 .spectate-panel .btn { min-width: auto; width: 100%; padding: 10px 16px; font-size: 13px; }
 
-/* VICTORY */
 .victory-screen { position: fixed; inset: 0; background: radial-gradient(circle at center, rgba(255,200,0,0.35) 0%, rgba(20,10,0,0.85) 60%, rgba(0,0,0,0.95) 100%); backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; z-index: 200; animation: victoryFadeIn 0.8s cubic-bezier(0.22,1,0.36,1); }
 @keyframes victoryFadeIn { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: scale(1); } }
 .victory-content { text-align: center; background: rgba(25,18,0,0.85); border: 3px solid #ffd700; border-radius: 28px; padding: 56px 96px; box-shadow: 0 0 120px rgba(255,215,0,0.6); max-width: 90vw; }
@@ -283,6 +399,14 @@ body.device-mobile #touchControls, body.device-tablet #touchControls { display: 
   .victory-content { padding: 30px 24px; }
   .victory-content h1 { font-size: 40px; letter-spacing: 6px; }
   .victory-trophy { font-size: 60px; }
+}
+@media (max-height: 500px) {
+  .joystick { width: 120px; height: 120px; bottom: 12px; }
+  .joystick-move { left: 16px; }
+  .joystick-aim  { right: 16px; }
+  .joystick-ring { width: 100px; height: 100px; }
+  .joystick-knob { width: 48px; height: 48px; }
+  .joystick-label { font-size: 9px; }
 }
 
 ::-webkit-scrollbar { width: 8px; }
