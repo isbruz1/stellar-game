@@ -169,9 +169,11 @@
 
 <div id="gameScreen" class="screen hidden">
   <canvas id="game"></canvas>
+
   <div id="hud">
     <button id="leaveGameBtn" class="icon-btn" title="Retour au salon">←</button>
     <div id="aliveCounter" class="alive-counter"></div>
+    <canvas id="minimap" width="180" height="180"></canvas>
     <div id="scoreboard"></div>
     <div id="statusBars">
       <div class="bar-wrap">
@@ -183,7 +185,6 @@
         <div class="bar"><div id="shieldBar" class="bar-fill shield"></div></div>
       </div>
     </div>
-    <canvas id="minimap" width="180" height="180"></canvas>
   </div>
 
   <div id="touchControls" class="touch-controls hidden">

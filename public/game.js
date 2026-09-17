@@ -1,20 +1,22 @@
 /* ==================================================================
-   STELLAR GAME — Client V9
+   STELLAR GAME — Client V10
    - Détection appareil (PC / Mobile / Tablette / Console)
    - Mode paysage + plein écran auto
    - 2 joysticks fixes (bleu = bouger, rouge = viser/tirer)
    - Multi-comptes avec lock multi-onglets
-   - Menu → Navigateur → Salon → Partie
    - Chiffres de dégâts, bouclier brisé, screen shake
    - Écran de mort + spectateur + écran de victoire
+   - Mode performance mobile (rendu allégé)
    ================================================================== */
 
 /* ============================================================
    1. DÉTECTION APPAREIL
    ============================================================ */
 const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
-let deviceType = "desktop";     // desktop | mobile | tablet | console
-let gamepadType = null;         // xbox | playstation | nintendo | steam | generic
+const PERF_MODE = isTouchDevice && window.innerWidth < 1024;
+
+let deviceType = "desktop";
+let gamepadType = null;
 let hasGamepad = false;
 
 function detectDevice() {
@@ -68,7 +70,7 @@ async function requestFullscreen() {
     if (screen.orientation && screen.orientation.lock) {
       try { await screen.orientation.lock("landscape"); } catch (e) {}
     }
-  } catch (e) { /* refusé */ }
+  } catch (e) {}
 }
 
 window.addEventListener("resize", checkLandscape);
@@ -127,7 +129,6 @@ applyDeviceClass();
 updateControlsHint();
 
 window.addEventListener("gamepadconnected", e => {
-  console.log("🎮 Manette connectée :", e.gamepad.id);
   detectDevice(); applyDeviceClass(); updateControlsHint(); updateDeviceBadge();
 });
 window.addEventListener("gamepaddisconnected", () => {
@@ -145,7 +146,7 @@ window.addEventListener("resize", () => {
 });
 
 /* ============================================================
-   4. ACCOUNTS (localStorage)
+   4. ACCOUNTS
    ============================================================ */
 function loadAccounts() {
   try { return JSON.parse(localStorage.getItem("accounts") || "[]"); }
@@ -241,7 +242,7 @@ const hpBar     = $("hpBar");
 const shieldBar = $("shieldBar");
 
 /* ============================================================
-   7. NAVIGATION ÉCRANS
+   7. NAVIGATION
    ============================================================ */
 function showScreen(name) {
   [splashScreen, profilesScreen, newAccountScreen, skinSelectScreen,
@@ -354,10 +355,16 @@ function connectSocket() {
 
   socket.on("victory", data => {
     gameStarted = false;
-    $("deathScreen").classList.add("hidden");
     $("spectatePanel").classList.add("hidden");
+
     if (data.winnerId === myId) {
+      // Gagnant → VICTOIRE
+      $("deathScreen").classList.add("hidden");
       $("victoryScreen").classList.remove("hidden");
+    } else {
+      // Perdant → TU ES MORT
+      $("victoryScreen").classList.add("hidden");
+      $("deathScreen").classList.remove("hidden");
     }
   });
 
@@ -397,10 +404,13 @@ function connectSocket() {
     hpBar.style.width = (me.hp / 100 * 100) + "%";
     shieldBar.style.width = (me.shield / 100 * 100) + "%";
 
+    // Détection mort
     if (!me.alive && !dead && gameStarted) {
       dead = true;
+      $("victoryScreen").classList.add("hidden");
       $("deathScreen").classList.remove("hidden");
     }
+    // Reset (nouvelle manche)
     if (me.alive && dead) {
       dead = false;
       $("deathScreen").classList.add("hidden");
@@ -424,8 +434,9 @@ function initStarfield(canvasId, opacity = 0.5) {
   resize();
   window.addEventListener("resize", resize);
 
+  const starCount = PERF_MODE ? 50 : 120;
   const stars = [];
-  for (let i = 0; i < 120; i++) {
+  for (let i = 0; i < starCount; i++) {
     stars.push({
       x: Math.random() * c.width,
       y: Math.random() * c.height,
@@ -457,8 +468,11 @@ function initStarfield(canvasId, opacity = 0.5) {
   resize();
   window.addEventListener("resize", resize);
 
+  const galaxyCount = PERF_MODE ? 300 : 600;
+  const starsCount = PERF_MODE ? 100 : 200;
+
   const galaxy = [];
-  for (let i = 0; i < 600; i++) {
+  for (let i = 0; i < galaxyCount; i++) {
     const armAngle = (Math.floor(Math.random() * 2) / 2) * Math.PI * 2;
     const dist = Math.pow(Math.random(), 0.6) * Math.min(c.width, c.height) * 0.45;
     galaxy.push({
@@ -471,7 +485,7 @@ function initStarfield(canvasId, opacity = 0.5) {
     });
   }
   const stars = [];
-  for (let i = 0; i < 200; i++) {
+  for (let i = 0; i < starsCount; i++) {
     stars.push({
       x: Math.random() * c.width,
       y: Math.random() * c.height,
@@ -769,7 +783,7 @@ finishAccountBtn.addEventListener("click", () => {
 });
 
 /* ============================================================
-   13. MENU PRINCIPAL
+   13. MENU
    ============================================================ */
 playBtn.addEventListener("click", () => {
   showScreen("browser");
@@ -791,7 +805,7 @@ disconnectBtn.addEventListener("click", () => {
 });
 
 /* ============================================================
-   14. NAVIGATEUR DE SERVEURS
+   14. BROWSER
    ============================================================ */
 closeBrowser.addEventListener("click", () => showScreen("menu"));
 
@@ -877,7 +891,7 @@ function esc(s) {
 }
 
 /* ============================================================
-   15. SALON
+   15. LOBBY
    ============================================================ */
 function renderLobby() {
   playersGrid.innerHTML = "";
@@ -964,7 +978,7 @@ $("leaveGameBtn").addEventListener("click", () => {
 });
 
 /* ============================================================
-   16. ÉCRAN DE MORT + SPECTATEUR
+   16. DEATH SCREEN
    ============================================================ */
 $("backToLobbyBtn").addEventListener("click", () => {
   if (!socket) return;
@@ -1008,7 +1022,7 @@ function renderSpectateList() {
 }
 
 /* ============================================================
-   17. VICTOIRE
+   17. VICTORY
    ============================================================ */
 $("returnToServerBtn").addEventListener("click", () => {
   $("victoryScreen").classList.add("hidden");
@@ -1021,7 +1035,7 @@ $("returnToServerBtn").addEventListener("click", () => {
 });
 
 /* ============================================================
-   18. CLAVIER (PC)
+   18. CLAVIER
    ============================================================ */
 const keyMap = {
   "z": "up",    "w": "up",    "arrowup": "up",
@@ -1044,7 +1058,7 @@ window.addEventListener("keyup", e => {
 });
 
 /* ============================================================
-   19. SOURIS (PC)
+   19. SOURIS
    ============================================================ */
 canvas.addEventListener("mousemove", e => {
   if (deviceType !== "desktop") return;
@@ -1066,7 +1080,7 @@ canvas.addEventListener("mousedown", e => {
 });
 
 /* ============================================================
-   20. CONTRÔLES TACTILES — 2 JOYSTICKS FIXES
+   20. JOYSTICKS TACTILES
    ============================================================ */
 const touchControls = $("touchControls");
 const moveJoystick  = $("moveJoystick");
@@ -1100,7 +1114,7 @@ function resetKnob(el) {
   el.style.transform = "translate(-50%, -50%)";
 }
 
-// ---------- MOVE (BLEU) ----------
+// MOVE (BLEU)
 moveJoystick.addEventListener("touchstart", e => {
   if (!gameStarted || dead) return;
   e.preventDefault();
@@ -1158,7 +1172,7 @@ function endMoveJoystick(e) {
 moveJoystick.addEventListener("touchend", endMoveJoystick);
 moveJoystick.addEventListener("touchcancel", endMoveJoystick);
 
-// ---------- AIM (ROUGE) ----------
+// AIM (ROUGE)
 aimJoystick.addEventListener("touchstart", e => {
   if (!gameStarted || dead) return;
   e.preventDefault();
@@ -1206,7 +1220,7 @@ function endAimJoystick(e) {
 aimJoystick.addEventListener("touchend", endAimJoystick);
 aimJoystick.addEventListener("touchcancel", endAimJoystick);
 
-// ---------- TIR AUTO (joystick rouge actif) ----------
+// Tir auto tant que le joystick rouge est actif
 let lastTouchShot = 0;
 setInterval(() => {
   if (!aimJoyState.active) return;
@@ -1268,12 +1282,14 @@ pollGamepad();
 /* ============================================================
    22. INPUT → SERVEUR
    ============================================================ */
+const INPUT_HZ = PERF_MODE ? 40 : 33; // ms entre envois
+
 setInterval(() => {
   if (!gameStarted || !myId || !socket) return;
   const me = serverState.players[myId];
   if (!me || !me.alive) return;
   socket.emit("input", { keys, angle: myAngle });
-}, 33);
+}, INPUT_HZ);
 
 /* ============================================================
    23. CANVAS
@@ -1318,6 +1334,22 @@ function drawRivers() {
   const time = Date.now() / 1000;
 
   md.rivers.forEach(r => {
+    if (PERF_MODE) {
+      // Version simple mobile
+      ctx.strokeStyle = "rgba(20, 60, 130, 0.95)";
+      ctx.lineWidth = r.width;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.beginPath();
+      r.points.forEach((p, i) => {
+        const x = p.x - cam.x, y = p.y - cam.y;
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+      return;
+    }
+
+    // Version détaillée desktop
     ctx.strokeStyle = "rgba(40, 30, 15, 0.8)";
     ctx.lineWidth = r.width + 24;
     ctx.lineCap = "round";
@@ -1371,6 +1403,26 @@ function drawForests() {
       const x = t.x - cam.x, y = t.y - cam.y;
       if (x < -80 || x > canvas.width + 80 || y < -80 || y > canvas.height + 80) return;
 
+      if (PERF_MODE) {
+        // Version simple mobile
+        ctx.fillStyle = "rgba(0,0,0,0.4)";
+        ctx.beginPath();
+        ctx.ellipse(x + 4, y + t.r * 0.5, t.r * 0.8, t.r * 0.35, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#1a3a1a";
+        ctx.beginPath();
+        ctx.arc(x, y, t.r, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#2d5a28";
+        ctx.beginPath();
+        ctx.arc(x - 4, y - t.r * 0.3, t.r * 0.6, 0, Math.PI * 2);
+        ctx.fill();
+        return;
+      }
+
+      // Version détaillée desktop
       const sway = Math.sin(time * 1.2 + idx * 0.7) * 2.5;
 
       ctx.fillStyle = "rgba(0,0,0,0.45)";
@@ -1405,6 +1457,15 @@ function drawWalls() {
     const x = w.x - cam.x, y = w.y - cam.y;
     if (x + w.w < 0 || x > canvas.width || y + w.h < 0 || y > canvas.height) return;
 
+    if (PERF_MODE) {
+      ctx.fillStyle = "#3a3a4a";
+      ctx.fillRect(x, y, w.w, w.h);
+      ctx.strokeStyle = "#5a5a7a";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x, y, w.w, w.h);
+      return;
+    }
+
     ctx.fillStyle = "rgba(0,0,0,0.5)";
     ctx.fillRect(x + 4, y + 6, w.w, w.h);
 
@@ -1421,6 +1482,8 @@ function drawWalls() {
 }
 
 function drawGrid() {
+  if (PERF_MODE) return; // pas de grille sur mobile
+
   const cam = getCamera();
   const g = 100;
   ctx.strokeStyle = "rgba(255,255,255,0.025)";
@@ -1451,11 +1514,13 @@ function drawPlayer(p, isMe) {
   const cam = getCamera();
   const x = p.x - cam.x, y = p.y - cam.y;
 
+  // Ombre
   ctx.fillStyle = "rgba(0,0,0,0.3)";
   ctx.beginPath();
   ctx.ellipse(x, y + 6, 32, 12, 0, 0, Math.PI * 2);
   ctx.fill();
 
+  // Bouclier
   if (p.shield > 0) {
     ctx.strokeStyle = `rgba(255,221,68,${0.3 + (p.shield / 100) * 0.5})`;
     ctx.lineWidth = 3;
@@ -1464,11 +1529,13 @@ function drawPlayer(p, isMe) {
     ctx.stroke();
   }
 
+  // Tank
   ctx.save();
   ctx.translate(x, y);
   drawTankShape(ctx, p.skin, p.angle);
   ctx.restore();
 
+  // Pseudo
   ctx.fillStyle = isMe ? "#4af" : "#fff";
   ctx.font = "bold 13px Segoe UI, Arial";
   ctx.textAlign = "center";
@@ -1581,7 +1648,8 @@ function drawScoreboard() {
     return a.pseudo.localeCompare(b.pseudo);
   });
 
-  const display = list.length <= 10 ? list : list.slice(0, 10);
+  const maxShow = PERF_MODE ? 6 : 10;
+  const display = list.length <= maxShow ? list : list.slice(0, maxShow);
   const extra = list.length - display.length;
 
   el.innerHTML = display.map(p => {
@@ -1605,7 +1673,12 @@ function drawAliveCounter() {
   el.textContent = `${alive} / ${total} SURVIVANT${alive > 1 ? "S" : ""}`;
 }
 
+let minimapFrame = 0;
 function drawMinimap() {
+  // Sur mobile : redessine une frame sur 3
+  minimapFrame++;
+  if (PERF_MODE && minimapFrame % 3 !== 0) return;
+
   const size = minimap.width;
   const scale = size / 4500;
 
@@ -1648,7 +1721,7 @@ function drawMinimap() {
 }
 
 /* ============================================================
-   25. BOUCLE DE RENDU
+   25. BOUCLE
    ============================================================ */
 function loop() {
   if (gameStarted) {

@@ -1,5 +1,5 @@
 /* ==================================================================
-   STELLAR GAME — Serveur
+   STELLAR GAME — Serveur V10
    ================================================================== */
 
 const express = require("express");
@@ -27,7 +27,7 @@ const BULLET_DAMAGE = 25;
 const SHOOT_COOLDOWN = 350;
 const MAX_HP = 100;
 const MAX_SHIELD = 100;
-const MAX_PLAYERS = 32;
+const MAX_PLAYERS = 50;
 
 const activeAccounts = {};
 function broadcastLockedAccounts() {
@@ -205,7 +205,7 @@ function resetForGame(room) {
   room.victoryDeclared = false;
   const ids = Object.keys(room.players);
   const count = ids.length;
-  const spawnRadius = Math.min(1400, 300 + count * 30);
+  const spawnRadius = Math.min(1600, 300 + count * 25);
   ids.forEach((id, i) => {
     const p = room.players[id];
     const a = (i / count) * Math.PI * 2;
@@ -492,6 +492,7 @@ function tick() {
     const room = rooms[rid];
     if (!room.gameStarted) continue;
 
+    // ---------- BALLES ----------
     for (let i = room.bullets.length - 1; i >= 0; i--) {
       const b = room.bullets[i];
       b.x += b.vx; b.y += b.vy; b.life--;
@@ -540,6 +541,12 @@ function tick() {
       if (hit) room.bullets.splice(i, 1);
     }
 
+    // ---------- ENVOI DU STATE (AVANT la victoire !) ----------
+    if (tickCounter % 3 === 0) {
+      io.to(room.id).emit("state", buildState(room));
+    }
+
+    // ---------- VICTOIRE ----------
     const aliveIds = Object.keys(room.players).filter(id => room.players[id].alive);
     const totalPlayers = Object.keys(room.players).length;
 
@@ -548,7 +555,9 @@ function tick() {
       room.victoryDeclared = true;
       room.gameStarted = false;
       room.bullets = [];
+
       io.to(room.id).emit("victory", { winnerId });
+
       for (const id in room.players) {
         const p = room.players[id];
         p.ready = false;
@@ -558,12 +567,9 @@ function tick() {
         p.spectating = null;
         p.spectators = 0;
       }
+
       io.to(room.id).emit("game-ended");
       broadcastLobby(room);
-    }
-
-    if (tickCounter % 2 === 0) {
-      io.to(room.id).emit("state", buildState(room));
     }
   }
 }

@@ -2,8 +2,7 @@
 html, body {
   height: 100%; width: 100%;
   font-family: 'Segoe UI', system-ui, Arial, sans-serif;
-  background: #03040d;
-  color: #fff;
+  background: #03040d; color: #fff;
   overflow: hidden;
   -webkit-tap-highlight-color: transparent;
   user-select: none;
@@ -12,7 +11,7 @@ html, body {
 .hidden { display: none !important; }
 .muted { color: #89a; }
 
-/* LANDSCAPE WARNING */
+/* LANDSCAPE */
 .landscape-warning {
   position: fixed; inset: 0;
   background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
@@ -21,36 +20,18 @@ html, body {
   z-index: 9999; gap: 24px; padding: 32px; text-align: center;
 }
 .rotate-phone { position: relative; width: 140px; height: 140px; }
-.phone-icon {
-  font-size: 100px; display: block;
-  animation: rotatePhone 2s ease-in-out infinite;
-  filter: drop-shadow(0 0 30px rgba(68,170,255,0.7));
-}
-@keyframes rotatePhone {
-  0%, 20%  { transform: rotate(0deg); }
-  50%, 80% { transform: rotate(90deg); }
-  100%     { transform: rotate(0deg); }
-}
-.rotate-arrow {
-  position: absolute; bottom: -10px; right: -10px;
-  font-size: 40px; color: #4af;
-  animation: spinArrow 2s linear infinite;
-}
+.phone-icon { font-size: 100px; display: block; animation: rotatePhone 2s ease-in-out infinite; filter: drop-shadow(0 0 30px rgba(68,170,255,0.7)); }
+@keyframes rotatePhone { 0%, 20% { transform: rotate(0); } 50%, 80% { transform: rotate(90deg); } 100% { transform: rotate(0); } }
+.rotate-arrow { position: absolute; bottom: -10px; right: -10px; font-size: 40px; color: #4af; animation: spinArrow 2s linear infinite; }
 @keyframes spinArrow { to { transform: rotate(360deg); } }
-.landscape-warning h1 {
-  font-size: 24px; font-weight: 800; letter-spacing: 6px;
-  color: #4af; text-shadow: 0 0 30px rgba(68,170,255,0.7);
-}
+.landscape-warning h1 { font-size: 24px; font-weight: 800; letter-spacing: 6px; color: #4af; text-shadow: 0 0 30px rgba(68,170,255,0.7); }
 .landscape-warning p { color: #89a; font-size: 14px; letter-spacing: 2px; }
 .landscape-warning p strong { color: #fd4; }
 .rotate-hint { display: flex; gap: 8px; margin-top: 16px; }
 .rotate-hint span { font-size: 28px; color: #4af; animation: hintPulse 1.2s ease-in-out infinite; }
 .rotate-hint span:nth-child(2) { animation-delay: 0.2s; }
 .rotate-hint span:nth-child(3) { animation-delay: 0.4s; }
-@keyframes hintPulse {
-  0%, 100% { opacity: 0.3; transform: translateX(0); }
-  50%      { opacity: 1; transform: translateX(6px); }
-}
+@keyframes hintPulse { 0%, 100% { opacity: 0.3; transform: translateX(0); } 50% { opacity: 1; transform: translateX(6px); } }
 
 /* SPLASH */
 .splash-screen { align-items: center; justify-content: center; background: #000; overflow: hidden; }
@@ -61,11 +42,7 @@ html, body {
 .splash-ring-2 { inset: 20px; border-color: rgba(170,68,255,0.35); border-left-color: transparent; border-right-color: transparent; animation: spin 6s linear infinite reverse; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .splash-logo { width: 220px; object-fit: contain; filter: drop-shadow(0 0 50px rgba(68,170,255,0.9)); opacity: 0; transform: scale(0.4); animation: logoWarp 1.5s cubic-bezier(0.22,1,0.36,1) 0.3s forwards; }
-@keyframes logoWarp {
-  0%   { opacity: 0; transform: scale(0.4) rotate(-10deg); filter: blur(24px); }
-  60%  { opacity: 1; transform: scale(1.1) rotate(3deg); filter: blur(0); }
-  100% { opacity: 1; transform: scale(1) rotate(0); filter: blur(0); }
-}
+@keyframes logoWarp { 0% { opacity: 0; transform: scale(0.4) rotate(-10deg); filter: blur(24px); } 60% { opacity: 1; transform: scale(1.1) rotate(3deg); filter: blur(0); } 100% { opacity: 1; transform: scale(1) rotate(0); filter: blur(0); } }
 .splash-title { font-size: 24px; font-weight: 800; letter-spacing: 12px; color: #cce8ff; text-shadow: 0 0 20px rgba(68,170,255,0.9); opacity: 0; animation: fadeUp 0.8s ease 1.2s forwards; }
 @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 .splash-loader { width: 300px; height: 3px; background: rgba(68,170,255,0.1); border-radius: 3px; overflow: hidden; }
@@ -73,25 +50,13 @@ html, body {
 @keyframes loadBar { from { width: 0%; } to { width: 100%; } }
 @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 
-.device-badge {
-  display: flex; align-items: center; gap: 10px;
-  background: rgba(68,170,255,0.1);
-  border: 2px solid rgba(68,170,255,0.4);
-  border-radius: 30px; padding: 8px 22px;
-  font-size: 13px; font-weight: 700; letter-spacing: 3px;
-  color: #cce8ff;
-  box-shadow: 0 0 24px rgba(68,170,255,0.3);
-  animation: fadeUp 0.6s ease 1.6s backwards;
-  transition: all 0.4s ease;
-}
+.device-badge { display: flex; align-items: center; gap: 10px; background: rgba(68,170,255,0.1); border: 2px solid rgba(68,170,255,0.4); border-radius: 30px; padding: 8px 22px; font-size: 13px; font-weight: 700; letter-spacing: 3px; color: #cce8ff; box-shadow: 0 0 24px rgba(68,170,255,0.3); animation: fadeUp 0.6s ease 1.6s backwards; transition: all 0.4s ease; }
 .device-badge.detected { border-color: #4f4; box-shadow: 0 0 30px rgba(68,255,68,0.5); color: #e8ffe8; }
 .device-badge.gamepad { border-color: #fd4; box-shadow: 0 0 30px rgba(255,221,68,0.5); color: #fff8d8; }
 .device-badge.mobile { border-color: #f4a; box-shadow: 0 0 30px rgba(255,68,170,0.5); color: #ffe8f4; }
 #deviceIcon { font-size: 18px; }
 
-/* ============================================================
-   PROFILES — Base (desktop)
-   ============================================================ */
+/* PROFILES */
 .profiles-screen { background: radial-gradient(circle at center, #0d1a3a, #03040d); overflow: hidden; }
 #profilesCanvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .profiles-header { position: relative; z-index: 1; text-align: center; padding: 14px 24px 4px; }
@@ -111,7 +76,6 @@ html, body {
 .account-card .delete-btn:hover { background: #f55; color: #fff; }
 .account-card.locked { opacity: 0.4; cursor: not-allowed; filter: grayscale(0.8); border-color: rgba(255,80,80,0.3); }
 .account-card.locked::before { content: "🔒 EN UTILISATION"; position: absolute; inset: 0; background: rgba(0,0,0,0.7); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #f55; font-weight: 800; font-size: 10px; letter-spacing: 1px; text-align: center; padding: 6px; line-height: 1.3; }
-
 .account-right { width: 290px; flex-shrink: 0; display: flex; align-items: stretch; justify-content: center; min-height: 0; }
 .selected-preview { background: rgba(0,0,0,0.5); border: 1px solid rgba(68,170,255,0.3); border-radius: 16px; padding: 12px; text-align: center; width: 100%; display: flex; flex-direction: column; min-height: 0; box-shadow: 0 0 40px rgba(68,170,255,0.15); overflow: hidden; }
 .selected-preview canvas { margin: 0 auto 4px; display: block; max-width: 110px; max-height: 110px; width: 100%; height: auto; flex-shrink: 0; }
@@ -123,7 +87,6 @@ html, body {
 .preview-skins canvas:hover { background: rgba(255,255,255,0.06); }
 .preview-skins canvas.selected { border-color: #4af; box-shadow: 0 0 12px rgba(68,170,255,0.5); }
 .selected-preview .btn { min-width: auto; width: 100%; padding: 12px; font-size: 14px; margin-top: auto; flex-shrink: 0; }
-
 .profiles-footer { position: relative; z-index: 1; padding: 10px; display: flex; justify-content: center; border-top: 1px solid rgba(255,255,255,0.06); flex-shrink: 0; }
 .profiles-footer .btn { min-width: 220px; padding: 12px 28px; font-size: 14px; }
 
@@ -142,7 +105,6 @@ input::placeholder { color: #556; }
 .login-box .btn { margin-top: 10px; min-width: auto; width: 100%; padding: 13px 24px; font-size: 15px; }
 .skin-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 8px 0 18px; }
 .skin-grid canvas { border-radius: 10px; padding: 3px; cursor: pointer; border: 3px solid transparent; transition: .15s; background: rgba(0,0,0,0.3); width: 100%; height: auto; }
-.skin-grid canvas:hover { background: rgba(255,255,255,0.06); }
 .skin-grid canvas.selected { border-color: #4af; box-shadow: 0 0 20px rgba(68,170,255,0.6); }
 
 /* MENU */
@@ -172,7 +134,7 @@ input::placeholder { color: #556; }
 .browser-header { display: flex; justify-content: space-between; align-items: center; }
 .browser-header h2 { font-size: 18px; letter-spacing: 6px; color: #4af; }
 .browser-tabs { display: flex; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 8px; }
-.tab-btn { background: transparent; border: none; color: #89a; padding: 12px 24px; font-size: 14px; font-weight: 700; letter-spacing: 3px; cursor: pointer; border-radius: 8px 8px 0 0; font-family: inherit; transition: .15s; }
+.tab-btn { background: transparent; border: none; color: #89a; padding: 12px 24px; font-size: 14px; font-weight: 700; letter-spacing: 3px; cursor: pointer; border-radius: 8px 8px 0 0; font-family: inherit; }
 .tab-btn.active { color: #4af; background: rgba(68,170,255,0.08); box-shadow: 0 -2px 0 #4af inset; }
 .tab-panel { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; padding: 8px 0; }
 .join-by-code { display: flex; gap: 12px; }
@@ -226,7 +188,35 @@ input::placeholder { color: #556; }
 #game { display: block; width: 100vw; height: 100vh; touch-action: none; }
 #hud { position: absolute; inset: 0; pointer-events: none; padding: 16px; }
 #hud button, #hud canvas, #hud > div { pointer-events: auto; }
-#scoreboard { position: absolute; top: 16px; right: 16px; background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 10px 14px; font-size: 12px; line-height: 1.5; min-width: 160px; max-width: 220px; max-height: 40vh; overflow-y: auto; backdrop-filter: blur(6px); }
+
+#minimap {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: rgba(0,0,0,0.6);
+  border: 2px solid rgba(68,170,255,0.5);
+  border-radius: 10px;
+  box-shadow: 0 0 20px rgba(68,170,255,0.3);
+  pointer-events: none;
+}
+
+#scoreboard {
+  position: absolute;
+  top: 210px;
+  right: 16px;
+  background: rgba(0,0,0,0.55);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 12px;
+  line-height: 1.5;
+  min-width: 160px;
+  max-width: 180px;
+  max-height: 40vh;
+  overflow-y: auto;
+  backdrop-filter: blur(6px);
+  pointer-events: auto;
+}
 #scoreboard::-webkit-scrollbar { width: 4px; }
 #scoreboard::-webkit-scrollbar-thumb { background: rgba(68,170,255,0.4); border-radius: 2px; }
 
@@ -238,17 +228,12 @@ input::placeholder { color: #556; }
 .bar-fill.hp { background: linear-gradient(90deg, #4f4, #2a2); box-shadow: 0 0 10px rgba(68,255,68,0.5); }
 .bar-fill.shield { background: linear-gradient(90deg, #fd4, #b80); box-shadow: 0 0 10px rgba(255,221,68,0.5); }
 
-#minimap { position: absolute; bottom: 16px; right: 16px; background: rgba(0,0,0,0.6); border: 2px solid rgba(68,170,255,0.5); border-radius: 10px; box-shadow: 0 0 20px rgba(68,170,255,0.3); }
-
 .alive-counter { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.6); border: 2px solid #4af; border-radius: 24px; padding: 8px 24px; font-size: 14px; font-weight: 800; letter-spacing: 3px; color: #cce8ff; text-shadow: 0 0 12px rgba(68,170,255,0.8); backdrop-filter: blur(6px); pointer-events: none; }
 
 /* TOUCH CONTROLS */
 .touch-controls { position: fixed; inset: 0; pointer-events: none; z-index: 30; }
-body.device-desktop .touch-controls,
-body.device-console .touch-controls { display: none !important; }
-body.device-mobile #touchControls,
-body.device-tablet #touchControls { display: block; }
-
+body.device-desktop .touch-controls, body.device-console .touch-controls { display: none !important; }
+body.device-mobile #touchControls, body.device-tablet #touchControls { display: block; }
 .joystick { position: absolute; width: 160px; height: 160px; bottom: 20px; pointer-events: auto; touch-action: none; display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .joystick-move { left: 24px; }
 .joystick-aim  { right: 24px; }
@@ -281,8 +266,7 @@ body.device-tablet #touchControls { display: block; }
 .spectate-panel .btn { min-width: auto; width: 100%; padding: 10px 16px; font-size: 13px; }
 
 /* VICTORY */
-.victory-screen { position: fixed; inset: 0; background: radial-gradient(circle at center, rgba(255,200,0,0.35) 0%, rgba(20,10,0,0.85) 60%, rgba(0,0,0,0.95) 100%); backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; z-index: 200; animation: victoryFadeIn 0.8s cubic-bezier(0.22,1,0.36,1); }
-@keyframes victoryFadeIn { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: scale(1); } }
+.victory-screen { position: fixed; inset: 0; background: radial-gradient(circle at center, rgba(255,200,0,0.35) 0%, rgba(20,10,0,0.85) 60%, rgba(0,0,0,0.95) 100%); backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; z-index: 200; }
 .victory-content { text-align: center; background: rgba(25,18,0,0.85); border: 3px solid #ffd700; border-radius: 28px; padding: 56px 96px; box-shadow: 0 0 120px rgba(255,215,0,0.6); max-width: 90vw; }
 .victory-trophy { font-size: 100px; margin-bottom: 12px; animation: trophyBounce 1.6s ease-in-out infinite; filter: drop-shadow(0 0 30px rgba(255,215,0,1)); }
 @keyframes trophyBounce { 0%, 100% { transform: translateY(0) rotate(-6deg); } 50% { transform: translateY(-18px) rotate(6deg); } }
@@ -300,33 +284,19 @@ body.device-tablet #touchControls { display: block; }
 .skin-option.selected { border-color: #4af; box-shadow: 0 0 16px rgba(68,170,255,0.4); }
 .modal-content .btn { min-width: auto; margin-top: 16px; }
 
-/* ============================================================
-   RESPONSIVE — TABLETTE
-   ============================================================ */
+/* RESPONSIVE */
 @media (max-width: 1024px) {
   .menu-title { font-size: 26px; letter-spacing: 3px; }
   .btn-huge { font-size: 20px !important; padding: 22px 60px !important; min-width: 300px !important; }
   .logo span { display: none; }
   .logo-img { width: 36px; height: 36px; }
-  #scoreboard { font-size: 11px; padding: 8px 12px; min-width: 130px; }
-  #minimap { width: 140px !important; height: 140px !important; }
 
-  .profiles-content {
-    flex-direction: column;
-    padding: 4px 12px 8px;
-    gap: 8px;
-  }
-  .account-list {
-    min-height: 90px;
-    max-height: 130px;
-    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-    gap: 8px;
-  }
+  .profiles-content { flex-direction: column; padding: 4px 12px 8px; gap: 8px; }
+  .account-list { min-height: 90px; max-height: 130px; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; }
   .account-card { padding: 8px 6px; }
   .account-card canvas { max-width: 45px; max-height: 45px; margin-bottom: 2px; }
   .account-card .name { font-size: 11px; }
   .account-card .real { font-size: 9px; }
-
   .account-right { width: 100%; max-height: 55vh; overflow-y: auto; }
   .selected-preview { padding: 8px 10px; gap: 2px; }
   .selected-preview canvas { max-width: 70px; max-height: 70px; margin-bottom: 2px; }
@@ -337,36 +307,24 @@ body.device-tablet #touchControls { display: block; }
   .selected-preview .btn { padding: 10px; font-size: 13px; }
 }
 
-/* ============================================================
-   RESPONSIVE — MOBILE
-   ============================================================ */
 @media (max-width: 768px) {
   .menu-title { font-size: 20px; letter-spacing: 2px; }
   .menu-sub { font-size: 11px; }
   .btn-huge { font-size: 16px !important; padding: 18px 40px !important; min-width: 240px !important; letter-spacing: 4px !important; }
-
   .login-box { padding: 24px 20px; min-width: auto; width: 92vw; }
   .login-logo { width: 100px; }
   .login-box h1 { font-size: 15px; letter-spacing: 3px; }
-
   .profiles-header { padding: 8px 16px 2px; }
   .profiles-header h1 { font-size: 12px; letter-spacing: 2px; }
   .profiles-header p { font-size: 10px; margin-top: 2px; }
   .mini-logo { width: 32px; }
-
   .profiles-content { padding: 2px 8px 6px; gap: 6px; }
-  .account-list {
-    min-height: 70px;
-    max-height: 100px;
-    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-    gap: 6px;
-  }
+  .account-list { min-height: 70px; max-height: 100px; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 6px; }
   .account-card { padding: 6px 4px; border-radius: 8px; }
   .account-card canvas { max-width: 35px; max-height: 35px; margin-bottom: 2px; }
   .account-card .name { font-size: 10px; }
   .account-card .real { font-size: 8px; }
   .account-card .delete-btn { width: 18px; height: 18px; font-size: 10px; top: 3px; right: 3px; }
-
   .account-right { max-height: 48vh; }
   .selected-preview { padding: 6px 8px; border-radius: 10px; }
   .selected-preview canvas { max-width: 55px; max-height: 55px; }
@@ -376,7 +334,6 @@ body.device-tablet #touchControls { display: block; }
   .preview-skins { gap: 2px; margin-bottom: 4px; }
   .preview-skins canvas { border-radius: 4px; }
   .selected-preview .btn { padding: 8px; font-size: 11px; letter-spacing: 1px; }
-
   .profiles-footer { padding: 6px; }
   .profiles-footer .btn { padding: 10px 20px; font-size: 12px; min-width: 180px; }
 
@@ -386,10 +343,15 @@ body.device-tablet #touchControls { display: block; }
   .join-btn { width: 100%; }
   .players-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
   .player-card { padding: 10px 6px; }
-  #statusBars { width: 180px; bottom: 14px; left: 14px; }
-  #minimap { width: 100px !important; height: 100px !important; bottom: 14px; right: 14px; }
-  #scoreboard { font-size: 10px; padding: 6px 10px; top: 8px; right: 8px; }
-  .alive-counter { font-size: 11px !important; padding: 6px 16px !important; }
+
+  #statusBars { width: 160px; bottom: 14px; left: 14px; gap: 6px; }
+  .bar { height: 10px; }
+  .bar-label { font-size: 10px; width: 22px; }
+
+  #minimap { width: 80px !important; height: 80px !important; top: 8px; right: 8px; }
+  #scoreboard { font-size: 9px; padding: 4px 8px; top: 96px; right: 8px; min-width: 90px; max-width: 110px; max-height: 30vh; }
+  .alive-counter { font-size: 10px !important; padding: 4px 12px !important; top: 8px !important; letter-spacing: 2px; }
+
   .death-content { padding: 28px 24px; }
   .death-content h1 { font-size: 32px; letter-spacing: 4px; }
   .victory-content { padding: 30px 24px; }
@@ -397,43 +359,16 @@ body.device-tablet #touchControls { display: block; }
   .victory-trophy { font-size: 60px; }
 }
 
-/* ============================================================
-   PORTRAIT MOBILE — profil en 2 colonnes
-   ============================================================ */
 @media (max-width: 768px) and (orientation: portrait) {
-  .profiles-content {
-    flex-direction: row;
-    gap: 8px;
-    padding: 4px 8px 6px;
-    flex: 1;
-    min-height: 0;
-  }
-  .account-list {
-    flex: 1;
-    min-height: 0;
-    max-height: none;
-    grid-template-columns: 1fr;
-    gap: 6px;
-    overflow-y: auto;
-    padding-right: 4px;
-  }
-  .account-right {
-    width: 52%;
-    max-height: none;
-    flex-shrink: 0;
-    overflow: hidden;
-  }
-  .selected-preview {
-    padding: 6px;
-    gap: 2px;
-  }
+  .profiles-content { flex-direction: row; gap: 8px; padding: 4px 8px 6px; flex: 1; min-height: 0; }
+  .account-list { flex: 1; min-height: 0; max-height: none; grid-template-columns: 1fr; gap: 6px; overflow-y: auto; padding-right: 4px; }
+  .account-right { width: 52%; max-height: none; flex-shrink: 0; overflow: hidden; }
+  .selected-preview { padding: 6px; gap: 2px; }
   .selected-preview canvas { max-width: 70px; max-height: 70px; }
   .preview-skins { grid-template-columns: repeat(3, 1fr); gap: 3px; }
-  .preview-skins canvas { padding: 0; }
   .selected-preview .btn { padding: 8px; font-size: 11px; }
 }
 
-/* Petits écrans paysage (téléphone tourné) */
 @media (max-height: 500px) {
   .joystick { width: 120px; height: 120px; bottom: 12px; }
   .joystick-move { left: 16px; }
@@ -442,27 +377,25 @@ body.device-tablet #touchControls { display: block; }
   .joystick-knob { width: 48px; height: 48px; }
   .joystick-label { font-size: 9px; }
 
+  #minimap { width: 70px !important; height: 70px !important; top: 8px; right: 8px; }
+  #scoreboard { top: 86px; right: 8px; font-size: 9px; padding: 4px 6px; min-width: 80px; max-width: 100px; }
+  .alive-counter { font-size: 10px !important; padding: 4px 12px !important; }
+
   .profiles-header { padding: 4px 12px 2px; }
   .mini-logo { width: 28px; }
   .profiles-header h1 { font-size: 11px; }
   .profiles-header p { display: none; }
-
-  .account-list {
-    min-height: 60px;
-    max-height: 80px;
-  }
+  .account-list { min-height: 60px; max-height: 80px; }
   .account-card { padding: 4px 6px; }
   .account-card canvas { max-width: 32px; max-height: 32px; }
   .account-card .name { font-size: 10px; }
   .account-card .real { display: none; }
-
   .selected-preview canvas { max-width: 50px; max-height: 50px; }
   .preview-pseudo { font-size: 12px; }
   .preview-real { display: none; }
   .preview-skins-label { display: none; }
   .preview-skins { gap: 2px; margin-bottom: 2px; }
   .selected-preview .btn { padding: 6px; font-size: 10px; }
-
   .profiles-footer { padding: 4px; }
   .profiles-footer .btn { padding: 8px 16px; font-size: 11px; min-width: 140px; }
 }
