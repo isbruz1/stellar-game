@@ -402,4 +402,25 @@ body.device-mobile #touchControls, body.device-tablet #touchControls { display: 
 
 ::-webkit-scrollbar { width: 8px; }
 ::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); }
-::-webkit-scrollbar-thumb { background: rgba(68,170,255,0.3); border-radius: 4px; }
+::-webkit-scrollbar-thumb { background: rgba(68,170,255,0.3); border-radius: 4px; }/* V11: outils, chat et petits écrans */
+.connection-badge { position: fixed; bottom: max(6px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); z-index: 210; padding: 4px 12px; border-radius: 20px; background: #081627e8; color: #80e2b0; font-size: 11px; pointer-events: none; }
+.stellar-toast { position: fixed; top: max(64px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 220; background: #102641f2; border: 1px solid #4af; border-radius: 12px; padding: 12px 18px; max-width: 90vw; text-align: center; }
+.lobby-tools { display: flex; gap: 8px; }
+.icon-btn.wide { width: auto; padding: 0 12px; font-size: 12px; }
+.lobby-chat { max-width: 720px; margin: 20px auto 0; padding: 16px; border: 1px solid #33445c; border-radius: 16px; background: #071223aa; }
+.lobby-chat h3 { color: #8ad1ff; font-size: 12px; letter-spacing: 2px; }
+#chatMessages { height: 110px; overflow-y: auto; margin: 8px 0; font-size: 13px; }
+#chatMessages p { padding: 4px; overflow-wrap: anywhere; }
+#chatForm { display: flex; gap: 8px; } #chatText { flex: 1; min-width: 0; }
+.preferences-panel { max-height: 90dvh; overflow-y: auto; min-width: min(400px, 90vw); }
+.preferences-panel label { display: flex; gap: 10px; align-items: center; }
+.preferences-panel input[type=checkbox] { width: 20px; height: 20px; }
+.backup-label { flex-direction: column; align-items: stretch !important; }
+.reduced-motion *, .reduced-motion *::before, .reduced-motion *::after { animation: none !important; transition: none !important; }
+.reduced-motion #galaxyCanvas, .reduced-motion #profilesCanvas, .reduced-motion #menuCanvas, .reduced-motion #newAccountCanvas, .reduced-motion #skinSelectCanvas { visibility: hidden; }
+.compact-hud #scoreboard { display: none; }
+.compact-hud #minimap { width: 90px; height: 90px; }
+button:focus-visible, input:focus-visible { outline: 3px solid #9df; outline-offset: 3px; }
+@media (max-width: 768px) { .top-bar { flex-wrap: wrap; gap: 8px; } .lobby-tools { gap: 4px; } .icon-btn.wide { padding: 0 8px; } .modal-content { min-width: 0; width: 92vw; } #serverBrowser { padding: 12px; } .join-by-code .btn.small { min-width: 110px; padding: 12px; } }
+body.device-mobile #statusBars, body.device-tablet #statusBars { bottom: 185px; width: 145px; }
+@media (max-height: 500px) { body.device-mobile #statusBars, body.device-tablet #statusBars { bottom: 143px; } .login-box { max-height: 94dvh; overflow-y: auto; } .profiles-content { flex-direction: row; min-height: 0; } .account-list { max-height: none; } }

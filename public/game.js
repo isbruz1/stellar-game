@@ -55,7 +55,7 @@ function checkLandscape() {
   if (!el) return;
   const isPortrait = window.innerHeight > window.innerWidth;
   const isMobileOrTablet = deviceType === "mobile" || deviceType === "tablet";
-  if (isPortrait && isMobileOrTablet) el.classList.remove("hidden");
+  if (isPortrait && isMobileOrTablet && !$("gameScreen").classList.contains("hidden")) el.classList.remove("hidden");
   else el.classList.add("hidden");
 }
 
@@ -272,6 +272,8 @@ function connectSocket() {
   socket = io();
 
   socket.on("connect", () => {
+    const reconnecting = Boolean(myId);
+    if (reconnecting) { currentRoomId = null; gameStarted = false; currentAccount = null; $("victoryScreen").classList.add("hidden"); $("deathScreen").classList.add("hidden"); showScreen("profiles"); renderAccounts(); }
     myId = socket.id;
     socket.emit("list-rooms");
   });
@@ -351,7 +353,10 @@ function connectSocket() {
     requestFullscreen();
   });
 
-  socket.on("game-ended", () => { gameStarted = false; });
+  socket.on("game-ended", () => {
+    gameStarted = false;
+    if ($("victoryScreen").classList.contains("hidden") && $("deathScreen").classList.contains("hidden")) showScreen("lobby");
+  });
 
   socket.on("victory", data => {
     gameStarted = false;
@@ -397,7 +402,7 @@ function connectSocket() {
   });
 
   socket.on("state", s => {
-    serverState = s;
+    serverState = { ...s, mapData: s.mapData || serverState.mapData };
     const me = s.players[myId];
     if (!me) return;
 
@@ -427,7 +432,8 @@ connectSocket();
    ============================================================ */
 function initStarfield(canvasId, opacity = 0.5) {
   const c = $(canvasId);
-  if (!c) return;
+  if (!c || c.dataset.animated) return;
+  c.dataset.animated = "true";
   const g = c.getContext("2d");
   let running = true;
   function resize() { c.width = window.innerWidth; c.height = window.innerHeight; }
@@ -447,6 +453,7 @@ function initStarfield(canvasId, opacity = 0.5) {
   }
   (function loop() {
     if (!running) return;
+    if (c.closest(".hidden") || document.hidden) { requestAnimationFrame(loop); return; }
     g.fillStyle = `rgba(3,4,13,${opacity})`;
     g.fillRect(0, 0, c.width, c.height);
     stars.forEach(s => {
@@ -947,7 +954,7 @@ function updateActionButtons() {
     actionBtn.textContent = "JOUER";
     actionBtn.className = "btn btn-green";
     actionBtn.disabled = guests.length > 0 && !guests.every(p => p.ready);
-    quitBtn.classList.add("hidden");
+    quitBtn.classList.remove("hidden");
   } else {
     const me = lobbyPlayers[myId];
     const ready = !!(me && me.ready);
