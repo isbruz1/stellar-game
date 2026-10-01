@@ -15,6 +15,7 @@ const io = new Server(server, {
   pingInterval: 10000
 });
 
+app.get("/health", (_req, res) => res.json({ ok: true }));
 app.use(express.static(path.join(__dirname, "public")));
 
 const MAP_W = 4500;
@@ -29,12 +30,12 @@ const MAX_HP = 100;
 const MAX_SHIELD = 100;
 const MAX_PLAYERS = 50;
 
-const activeAccounts = {};
+const activeAccounts = Object.create(null);
 function broadcastLockedAccounts() {
   io.emit("locked-accounts", Object.values(activeAccounts).map(a => a.pseudoOriginal));
 }
 
-const rooms = {};
+const rooms = Object.create(null);
 let tickCounter = 0;
 
 function genRoomId() {
@@ -162,20 +163,20 @@ function publicPlayers(room) {
   return out;
 }
 
-function buildState(room) {
+function buildState(room, includeMap = false) {
   const p = {};
   for (const id in room.players) {
     const pl = room.players[id];
     p[id] = {
       id, x: pl.x, y: pl.y, angle: pl.angle, skin: pl.skin,
       hp: pl.hp, shield: pl.shield, alive: pl.alive,
-      pseudo: pl.pseudo, realName: pl.realName
+      kills: pl.kills || 0, pseudo: pl.pseudo, realName: pl.realName
     };
   }
   return {
     players: p,
     bullets: room.bullets.map(b => ({ id: b.id, x: b.x, y: b.y })),
-    mapData: room.mapData
+    ...(includeMap ? { mapData: room.mapData } : {})
   };
 }
 
@@ -219,6 +220,9 @@ function resetForGame(room) {
     p.shield = MAX_SHIELD;
     p.alive = true;
     p.lastShot = 0;
+    p.input = {};
+    p.inputAt = 0;
+    p.kills = 0;
     p.spectating = null;
     p.spectators = 0;
   });
@@ -253,7 +257,10 @@ io.on("connection", socket => {
     }
   });
 
-  socket.on("create-room", data => {
+  socket.on("create-room", (data = {}) => {
+    if (currentRoom) return socket.emit("join-error", "Quitte ton salon avant de créer un serveur.");
+    if (!data || typeof data !== "object") return;
+    data.name = String(data.name || "").trim().slice(0, 24);
     const room = createRoom(data.name, socket.id);
     currentRoom = room.id;
     socket.join(room.id);
@@ -261,7 +268,9 @@ io.on("connection", socket => {
     io.emit("room-list-update", roomList());
   });
 
-  socket.on("join-room", data => {
+  socket.on("join-room", (data = {}) => {
+    if (!data || typeof data !== "object") return;
+    if (currentRoom && currentRoom !== data.id) return socket.emit("join-error", "Quitte ton salon actuel d’abord.");
     const room = rooms[data.id];
     if (!room) return socket.emit("join-error", "Serveur introuvable.");
     if (Object.keys(room.players).length >= room.maxPlayers)
@@ -276,7 +285,7 @@ io.on("connection", socket => {
       id: socket.id,
       pseudo: String(data.pseudo || "Joueur").slice(0, 16),
       realName: String(data.realName || "").slice(0, 32),
-      skin: Number(data.skin) || 0,
+      skin: Math.max(0, Math.min(5, Math.floor(Number(data.skin) || 0))),
       ready: false,
       x: MAP_W / 2, y: MAP_H / 2, angle: 0,
       hp: MAX_HP, shield: MAX_SHIELD, alive: true, lastShot: 0,
@@ -325,13 +334,13 @@ io.on("connection", socket => {
 
   socket.on("start-game", () => {
     const room = rooms[currentRoom];
-    if (!room || socket.id !== room.hostId) return;
+    if (!room || room.gameStarted || socket.id !== room.hostId || !room.players[socket.id]) return;
     const guests = Object.values(room.players).filter(p => p.id !== room.hostId);
     if (guests.length > 0 && !guests.every(p => p.ready)) return;
     resetForGame(room);
     room.gameStarted = true;
     io.to(room.id).emit("game-started");
-    io.to(room.id).emit("state", buildState(room));
+    io.to(room.id).emit("state", buildState(room, true));
   });
 
   socket.on("leave-game", () => {
@@ -340,9 +349,8 @@ io.on("connection", socket => {
     const p = room.players[socket.id];
     if (p) {
       p.ready = false;
-      p.hp = MAX_HP;
-      p.shield = MAX_SHIELD;
-      p.alive = true;
+      p.input = {};
+      if (room.gameStarted) { p.hp = 0; p.alive = false; }
       p.spectating = null;
       for (const id in room.players) {
         if (room.players[id].spectating === socket.id) room.players[id].spectating = null;
@@ -380,48 +388,19 @@ io.on("connection", socket => {
     p.spectating = null;
   });
 
-  socket.on("input", data => {
+  socket.on("input", (data = {}) => {
     const room = rooms[currentRoom];
     if (!room) return;
     const p = room.players[socket.id];
     if (!p || !room.gameStarted || !p.alive) return;
 
-    const k = data.keys || {};
-    let dx = 0, dy = 0;
-    if (k.up) dy -= 1;
-    if (k.down) dy += 1;
-    if (k.left) dx -= 1;
-    if (k.right) dx += 1;
-    const len = Math.hypot(dx, dy);
-
-    let nx = p.x, ny = p.y;
-    if (len > 0) {
-      nx += (dx / len) * PLAYER_SPEED;
-      ny += (dy / len) * PLAYER_SPEED;
-    }
-    nx = Math.max(PLAYER_RADIUS, Math.min(MAP_W - PLAYER_RADIUS, nx));
-    ny = Math.max(PLAYER_RADIUS, Math.min(MAP_H - PLAYER_RADIUS, ny));
-
-    const md = room.mapData;
-    if (md) {
-      const currentlyStuck =
-        isInsideWall(md.walls, p.x, p.y, PLAYER_RADIUS) ||
-        isInsideTree(md.forests, p.x, p.y, PLAYER_RADIUS);
-      if (currentlyStuck) {
-        p.x = nx; p.y = ny;
-      } else {
-        if (!isInsideWall(md.walls, nx, p.y, PLAYER_RADIUS)) p.x = nx;
-        if (!isInsideWall(md.walls, p.x, ny, PLAYER_RADIUS) &&
-            !isInsideTree(md.forests, p.x, ny, PLAYER_RADIUS)) p.y = ny;
-      }
-    } else {
-      p.x = nx; p.y = ny;
-    }
-
-    if (typeof data.angle === "number") p.angle = data.angle;
+    if (!data || typeof data !== "object") return;
+    p.input = data.keys && typeof data.keys === "object" ? data.keys : {};
+    p.inputAt = Date.now();
+    if (Number.isFinite(data.angle)) p.angle = data.angle;
   });
 
-  socket.on("shoot", data => {
+  socket.on("shoot", (data = {}) => {
     const room = rooms[currentRoom];
     if (!room) return;
     const p = room.players[socket.id];
@@ -429,7 +408,7 @@ io.on("connection", socket => {
     const now = Date.now();
     if (now - p.lastShot < SHOOT_COOLDOWN) return;
     p.lastShot = now;
-    if (typeof data.angle === "number") p.angle = data.angle;
+    if (data && Number.isFinite(data.angle)) p.angle = data.angle;
 
     const md = room.mapData;
     let offset = 34;
@@ -452,6 +431,18 @@ io.on("connection", socket => {
     });
   });
 
+  let lastChat = 0;
+  socket.on("ping-check", callback => { if (typeof callback === "function") callback(); });
+  socket.on("chat-message", message => {
+    const room = rooms[currentRoom];
+    const p = room?.players[socket.id];
+    if (!p || typeof message !== "string" || Date.now() - lastChat < 700) return;
+    const text = message.trim().slice(0, 180);
+    if (!text) return;
+    lastChat = Date.now();
+    io.to(room.id).emit("chat-message", { pseudo: p.pseudo, text });
+  });
+
   socket.on("disconnect", () => {
     for (const key in activeAccounts) {
       if (activeAccounts[key].socketId === socket.id) delete activeAccounts[key];
@@ -468,6 +459,7 @@ io.on("connection", socket => {
       const old = room.players[p.spectating];
       if (old) old.spectators = Math.max(0, (old.spectators || 0) - 1);
     }
+    io.sockets.sockets.get(sid)?.leave(rid);
     delete room.players[sid];
     if (Object.keys(room.players).length === 0) {
       delete rooms[rid];
@@ -491,6 +483,41 @@ function tick() {
   for (const rid in rooms) {
     const room = rooms[rid];
     if (!room.gameStarted) continue;
+
+    for (const p of Object.values(room.players)) {
+      if (!p.alive) continue;
+      const k = Date.now() - p.inputAt < 250 ? p.input || {} : {};
+      let dx = 0, dy = 0;
+      if (k.up) dy -= 1;
+      if (k.down) dy += 1;
+      if (k.left) dx -= 1;
+      if (k.right) dx += 1;
+      const len = Math.hypot(dx, dy);
+
+      let nx = p.x, ny = p.y;
+      if (len > 0) {
+        nx += (dx / len) * (PLAYER_SPEED * 0.5);
+        ny += (dy / len) * (PLAYER_SPEED * 0.5);
+      }
+      nx = Math.max(PLAYER_RADIUS, Math.min(MAP_W - PLAYER_RADIUS, nx));
+      ny = Math.max(PLAYER_RADIUS, Math.min(MAP_H - PLAYER_RADIUS, ny));
+
+      const md = room.mapData;
+      if (md) {
+        const currentlyStuck =
+          isInsideWall(md.walls, p.x, p.y, PLAYER_RADIUS) ||
+          isInsideTree(md.forests, p.x, p.y, PLAYER_RADIUS);
+        if (currentlyStuck) {
+          p.x = nx; p.y = ny;
+        } else {
+          if (!isInsideWall(md.walls, nx, p.y, PLAYER_RADIUS) && !isInsideTree(md.forests, nx, p.y, PLAYER_RADIUS)) p.x = nx;
+          if (!isInsideWall(md.walls, p.x, ny, PLAYER_RADIUS) &&
+              !isInsideTree(md.forests, p.x, ny, PLAYER_RADIUS)) p.y = ny;
+        }
+      } else {
+        p.x = nx; p.y = ny;
+      }
+    }
 
     // ---------- BALLES ----------
     for (let i = room.bullets.length - 1; i >= 0; i--) {
@@ -534,7 +561,12 @@ function tick() {
             if (victimSocket) victimSocket.emit("screen-shake");
           }
 
-          if (p.hp <= 0) { p.hp = 0; p.alive = false; }
+          if (p.hp <= 0) {
+            p.hp = 0; p.alive = false;
+            const attacker = room.players[b.owner];
+            if (attacker) attacker.kills = (attacker.kills || 0) + 1;
+            io.to(room.id).emit("elimination", { attackerId: b.owner, attacker: attacker?.pseudo || "?", victim: p.pseudo });
+          }
           break;
         }
       }
