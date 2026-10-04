@@ -1,6 +1,6 @@
 /* ==================================================================
-   TANK.IO — Serveur V4
-   Carte 8000×8000 • Fix direction • Fix disparitions • Optimisé classe
+   TANK.IO — Serveur V5
+   Optimisé FPS • State 15Hz • Carte 8000×8000
    ================================================================== */
 
 const express = require("express");
@@ -23,7 +23,6 @@ const io = new Server(server, {
 
 app.use(express.static(path.join(__dirname, "public")));
 
-// Route de santé
 app.get("/health", (req, res) => {
   res.status(200).json({
     status: "ok",
@@ -47,7 +46,6 @@ const DASH_DURATION = 200;
 const DASH_SPEED = 12;
 const XP_PER_KILL = 100;
 
-// ---------- Armes ----------
 const WEAPONS = {
   pistol:  { name: "Pistolet",  damage: 22, speed: 10, cooldown: 320,  bulletLife: 150, spread: 0,    bullets: 1, color: "#ff4" },
   smg:     { name: "SMG",       damage: 10, speed: 12, cooldown: 90,   bulletLife: 130, spread: 0.1,  bullets: 1, color: "#fd4" },
@@ -56,9 +54,6 @@ const WEAPONS = {
   sniper:  { name: "Sniper",    damage: 75, speed: 20, cooldown: 1200, bulletLife: 350, spread: 0,    bullets: 1, color: "#f4f" }
 };
 
-// ============================================================
-//  ROOMS
-// ============================================================
 const rooms = {};
 let tickCounter = 0;
 
@@ -217,7 +212,6 @@ function resetForGame(room) {
 
   const ids = Object.keys(room.players);
   const count = ids.length;
-  // Spawn radius adapté à la grande carte
   const spawnRadius = Math.min(2800, 600 + count * 40);
 
   ids.forEach((id, i) => {
@@ -241,9 +235,6 @@ function resetForGame(room) {
   });
 }
 
-// ============================================================
-//  SOCKET EVENTS
-// ============================================================
 io.on("connection", socket => {
   console.log(`🔌 Connexion : ${socket.id} (${io.engine.clientsCount} en ligne)`);
   let currentRoom = null;
@@ -449,7 +440,6 @@ io.on("connection", socket => {
     if (now - p.lastShot < weapon.cooldown) return;
     p.lastShot = now;
 
-    // ⚠️ Fix direction : on prend l'angle envoyé par le client
     const shootAngle = typeof data.angle === "number" ? data.angle : p.angle;
     p.angle = shootAngle;
 
@@ -598,8 +588,8 @@ function tick() {
       }
     }
 
-    // Envoi state à 20 Hz (3 frames sur 4)
-    if (tickCounter % 3 === 0) {
+    // Envoi state à 15 Hz (1 frame sur 4)
+    if (tickCounter % 4 === 0) {
       io.to(room.id).emit("state", buildState(room));
     }
 
@@ -627,12 +617,8 @@ function tick() {
 }
 setInterval(tick, 1000 / 60);
 
-// ============================================================
-//  DÉMARRAGE
-// ============================================================
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`✅ Tank.io — Serveur démarré sur le port ${PORT}`);
   console.log(`🗺️ Carte : ${MAP_W}×${MAP_H}`);
-  console.log(`🌐 Health : http://localhost:${PORT}/health`);
 });

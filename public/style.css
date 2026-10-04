@@ -10,6 +10,7 @@ html, body {
 .screen { position: fixed; inset: 0; display: flex; flex-direction: column; }
 .hidden { display: none !important; }
 .muted { color: #89a; }
+.small { font-size: 12px; }
 
 /* LANDSCAPE */
 .landscape-warning {
@@ -56,6 +57,15 @@ html, body {
 .device-badge.mobile { border-color: #f4a; box-shadow: 0 0 30px rgba(255,68,170,0.5); color: #ffe8f4; }
 #deviceIcon { font-size: 18px; }
 
+.connection-status {
+  margin-top: 12px;
+  font-size: 12px;
+  color: #89a;
+  letter-spacing: 2px;
+  text-align: center;
+  transition: color 0.3s ease;
+}
+
 /* PROFILES */
 .profiles-screen { background: radial-gradient(circle at center, #0d1a3a, #03040d); overflow: hidden; }
 #profilesCanvas { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -70,17 +80,13 @@ html, body {
 .account-card.selected { border-color: #4af; box-shadow: 0 0 30px rgba(68,170,255,0.4); background: rgba(68,170,255,0.1); }
 .account-card canvas { display: block; margin: 0 auto 6px; max-width: 60px; max-height: 60px; }
 .account-card .name { font-weight: 700; font-size: 13px; }
-.account-card .real { font-size: 10px; color: #89a; font-style: italic; margin-top: 1px; }
 .account-card .delete-btn { position: absolute; top: 5px; right: 5px; background: rgba(255,50,50,0.15); border: 1px solid rgba(255,50,50,0.4); color: #f55; width: 24px; height: 24px; border-radius: 7px; cursor: pointer; font-size: 12px; opacity: 0; transition: .15s; }
 .account-card:hover .delete-btn { opacity: 1; }
 .account-card .delete-btn:hover { background: #f55; color: #fff; }
-.account-card.locked { opacity: 0.4; cursor: not-allowed; filter: grayscale(0.8); border-color: rgba(255,80,80,0.3); }
-.account-card.locked::before { content: "🔒 EN UTILISATION"; position: absolute; inset: 0; background: rgba(0,0,0,0.7); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #f55; font-weight: 800; font-size: 10px; letter-spacing: 1px; text-align: center; padding: 6px; line-height: 1.3; }
 .account-right { width: 290px; flex-shrink: 0; display: flex; align-items: stretch; justify-content: center; min-height: 0; }
 .selected-preview { background: rgba(0,0,0,0.5); border: 1px solid rgba(68,170,255,0.3); border-radius: 16px; padding: 12px; text-align: center; width: 100%; display: flex; flex-direction: column; min-height: 0; box-shadow: 0 0 40px rgba(68,170,255,0.15); overflow: hidden; }
 .selected-preview canvas { margin: 0 auto 4px; display: block; max-width: 110px; max-height: 110px; width: 100%; height: auto; flex-shrink: 0; }
 .preview-pseudo { font-size: 17px; font-weight: 800; color: #4af; letter-spacing: 2px; text-shadow: 0 0 15px rgba(68,170,255,0.6); flex-shrink: 0; }
-.preview-real { font-size: 11px; color: #89a; font-style: italic; margin-top: 1px; flex-shrink: 0; }
 .preview-skins-label { font-size: 9px; color: #89a; letter-spacing: 3px; margin-top: 8px; margin-bottom: 4px; flex-shrink: 0; }
 .preview-skins { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-bottom: 8px; flex-shrink: 0; }
 .preview-skins canvas { border-radius: 6px; padding: 1px; cursor: pointer; border: 2px solid transparent; transition: .15s; width: 100%; height: auto; max-width: 100%; max-height: none; }
@@ -121,9 +127,8 @@ input::placeholder { color: #556; }
 .logo { display: flex; align-items: center; gap: 12px; font-size: 16px; font-weight: 800; letter-spacing: 4px; color: #4af; }
 .logo-img { width: 40px; height: 40px; object-fit: contain; filter: drop-shadow(0 0 12px rgba(68,170,255,0.7)); }
 .top-actions { display: flex; align-items: center; gap: 12px; }
-.user-chip, .room-code-chip { display: flex; flex-direction: column; align-items: flex-end; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 6px 14px; font-size: 13px; font-weight: 700; }
-.user-real { font-size: 10px; color: #89a; font-style: italic; font-weight: 400; }
-.room-code-chip { flex-direction: row; align-items: center; gap: 8px; color: #89a; letter-spacing: 2px; font-size: 11px; }
+.user-chip, .room-code-chip { display: flex; flex-direction: row; align-items: center; gap: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 6px 14px; font-size: 13px; font-weight: 700; }
+.room-code-chip { color: #89a; letter-spacing: 2px; font-size: 11px; }
 .room-code-chip strong { color: #4af; font-size: 16px; letter-spacing: 3px; }
 .icon-btn { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #fff; font-size: 18px; width: 44px; height: 44px; border-radius: 10px; cursor: pointer; transition: .2s; }
 .icon-btn:hover { background: rgba(255,255,255,0.18); }
@@ -166,7 +171,6 @@ input::placeholder { color: #556; }
 .player-card.ready { border-color: #4f4; box-shadow: 0 0 24px rgba(68,255,68,0.25); }
 .player-card canvas { display: block; margin: 0 auto 10px; }
 .player-card .name { font-weight: 700; font-size: 14px; }
-.player-card .realname { font-size: 11px; color: #89a; font-style: italic; margin-top: 2px; }
 .player-card .badge { position: absolute; top: 8px; right: 8px; font-size: 10px; padding: 3px 8px; border-radius: 8px; background: #ffd700; color: #000; font-weight: 800; }
 .player-card .ready-tag { color: #4f4; font-size: 12px; margin-top: 6px; font-weight: 700; }
 .bottom-bar { padding: 24px; display: flex; flex-direction: column; gap: 12px; align-items: center; border-top: 1px solid rgba(255,255,255,0.08); }
@@ -188,36 +192,9 @@ input::placeholder { color: #556; }
 #hud { position: absolute; inset: 0; pointer-events: none; padding: 16px; }
 #hud button, #hud canvas, #hud > div { pointer-events: auto; }
 
-#minimap {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  background: rgba(0,0,0,0.6);
-  border: 2px solid rgba(68,170,255,0.5);
-  border-radius: 10px;
-  box-shadow: 0 0 20px rgba(68,170,255,0.3);
-  pointer-events: none;
-}
+#minimap { position: absolute; top: 16px; right: 16px; background: rgba(0,0,0,0.6); border: 2px solid rgba(68,170,255,0.5); border-radius: 10px; box-shadow: 0 0 20px rgba(68,170,255,0.3); pointer-events: none; }
 
-#scoreboard {
-  position: absolute;
-  top: 210px;
-  right: 16px;
-  background: rgba(0,0,0,0.55);
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 10px;
-  padding: 10px 14px;
-  font-size: 12px;
-  line-height: 1.5;
-  min-width: 180px;
-  max-width: 220px;
-  max-height: 40vh;
-  overflow-y: auto;
-  backdrop-filter: blur(6px);
-  pointer-events: auto;
-}
-#scoreboard::-webkit-scrollbar { width: 4px; }
-#scoreboard::-webkit-scrollbar-thumb { background: rgba(68,170,255,0.4); border-radius: 2px; }
+#scoreboard { position: absolute; top: 210px; right: 16px; background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 10px 14px; font-size: 12px; line-height: 1.5; min-width: 180px; max-width: 220px; max-height: 40vh; overflow-y: auto; backdrop-filter: blur(6px); pointer-events: auto; }
 
 #statusBars { position: absolute; bottom: 20px; left: 20px; display: flex; flex-direction: column; gap: 8px; width: 260px; }
 .bar-wrap { display: flex; align-items: center; gap: 10px; }
@@ -225,11 +202,10 @@ input::placeholder { color: #556; }
 .bar { flex: 1; height: 14px; background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; overflow: hidden; }
 .bar-fill { height: 100%; transition: width 0.15s linear; border-radius: 8px; }
 .bar-fill.hp { background: linear-gradient(90deg, #4f4, #2a2); box-shadow: 0 0 10px rgba(68,255,68,0.5); }
-.bar-fill.shield { background: linear-gradient(90deg, #fd4, #b80); box-shadow: 0 0 10px rgba(255,221,68,0.5); }
+.bar-fill.xp { background: linear-gradient(90deg, #f4f, #a4f); box-shadow: 0 0 10px rgba(170,68,255,0.5); }
 
 .alive-counter { position: absolute; top: 60px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.6); border: 2px solid #4af; border-radius: 24px; padding: 6px 20px; font-size: 13px; font-weight: 800; letter-spacing: 2px; color: #cce8ff; text-shadow: 0 0 12px rgba(68,170,255,0.8); backdrop-filter: blur(6px); pointer-events: none; }
 
-/* KILL FEED */
 .kill-feed { position: absolute; top: 100px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 4px; pointer-events: none; z-index: 20; }
 .kill-feed-item { background: rgba(0,0,0,0.75); border-left: 3px solid #f55; padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 700; color: #fff; animation: killFeedIn 0.3s ease; }
 .kill-feed-item .killer { color: #4af; }
@@ -237,15 +213,19 @@ input::placeholder { color: #556; }
 .kill-feed-item .weapon { color: #fd4; font-size: 14px; }
 @keyframes killFeedIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 
-/* TIMER */
 .match-timer { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.65); border: 2px solid #4af; border-radius: 12px; padding: 6px 20px; font-size: 18px; font-weight: 800; letter-spacing: 2px; color: #cce8ff; pointer-events: none; }
 
-/* WEAPON BAR */
+.fps-counter { position: absolute; top: 16px; right: 220px; background: rgba(0,0,0,0.7); border: 1px solid #4af; border-radius: 8px; padding: 4px 10px; font-size: 12px; font-weight: 800; letter-spacing: 1px; color: #4af; font-family: 'Courier New', monospace; pointer-events: none; z-index: 100; transition: color 0.3s ease; }
+.fps-counter.good { color: #4f4; border-color: #4f4; }
+.fps-counter.warn { color: #fd4; border-color: #fd4; }
+.fps-counter.bad  { color: #f55; border-color: #f55; }
+
 .weapon-bar { position: absolute; bottom: 20px; right: 20px; display: flex; gap: 8px; background: rgba(0,0,0,0.6); border-radius: 12px; padding: 8px; pointer-events: auto; }
 .weapon-slot { width: 44px; height: 44px; border-radius: 8px; background: rgba(255,255,255,0.06); border: 2px solid rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center; font-weight: 800; color: #89a; cursor: pointer; transition: .15s; }
 .weapon-slot.active { background: rgba(68,170,255,0.2); border-color: #4af; color: #fff; box-shadow: 0 0 12px rgba(68,170,255,0.6); }
 
-/* CHAT */
+.level-indicator { position: absolute; top: 100px; left: 20px; background: linear-gradient(135deg, #4af, #a4f); border-radius: 12px; padding: 6px 18px; font-size: 13px; font-weight: 800; letter-spacing: 3px; color: #fff; text-shadow: 0 0 12px rgba(255,255,255,0.6); box-shadow: 0 0 20px rgba(68,170,255,0.5); pointer-events: none; }
+
 .chat-box { position: absolute; bottom: 20px; left: 20px; width: 280px; max-height: 200px; display: flex; flex-direction: column; pointer-events: auto; }
 .chat-messages { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; background: rgba(0,0,0,0.5); border-radius: 8px 8px 0 0; font-size: 11px; line-height: 1.4; max-height: 140px; }
 .chat-messages .msg-pseudo { color: #4af; font-weight: 700; }
@@ -254,11 +234,11 @@ input::placeholder { color: #556; }
 .chat-input.active { display: block; }
 .chat-input::placeholder { color: #556; }
 
-/* POWERUP */
-.powerup-indicator { position: absolute; top: 100px; left: 16px; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
-.powerup-chip { background: rgba(0,0,0,0.75); border-radius: 20px; padding: 6px 14px; font-size: 12px; font-weight: 700; letter-spacing: 1px; }
+.dash-btn { position: absolute; bottom: 200px; right: 20px; width: 70px; height: 70px; border-radius: 50%; background: radial-gradient(circle at 40% 40%, #4af, #1a3a6a); border: 3px solid #9cf; color: #fff; font-size: 28px; cursor: pointer; box-shadow: 0 0 20px rgba(68,170,255,0.8); pointer-events: auto; transition: .15s; display: none; }
+.dash-btn:active { transform: scale(0.9); }
+body.device-mobile .dash-btn, body.device-tablet .dash-btn { display: flex; align-items: center; justify-content: center; }
 
-/* TOUCH CONTROLS */
+/* TOUCH */
 .touch-controls { position: fixed; inset: 0; pointer-events: none; z-index: 30; }
 body.device-desktop .touch-controls, body.device-console .touch-controls { display: none !important; }
 body.device-mobile #touchControls, body.device-tablet #touchControls { display: block; }
@@ -271,9 +251,6 @@ body.device-mobile #touchControls, body.device-tablet #touchControls { display: 
 .joystick-ring { position: relative; width: 130px; height: 130px; border-radius: 50%; border: 3px solid rgba(255,255,255,0.3); background: rgba(0,0,0,0.35); backdrop-filter: blur(4px); pointer-events: none; transition: all 0.15s ease; }
 .joystick-move .joystick-ring { border-color: rgba(68,170,255,0.7); box-shadow: 0 0 25px rgba(68,170,255,0.5), inset 0 0 20px rgba(68,170,255,0.15); }
 .joystick-aim .joystick-ring { border-color: rgba(255,80,80,0.7); box-shadow: 0 0 25px rgba(255,80,80,0.5), inset 0 0 20px rgba(255,80,80,0.15); }
-.joystick.active .joystick-ring { transform: scale(1.08); }
-.joystick-move.active .joystick-ring { box-shadow: 0 0 40px rgba(68,170,255,0.9), inset 0 0 30px rgba(68,170,255,0.25); }
-.joystick-aim.active .joystick-ring { box-shadow: 0 0 40px rgba(255,80,80,0.9), inset 0 0 30px rgba(255,80,80,0.25); }
 .joystick-knob { position: absolute; left: 50%; top: 50%; width: 60px; height: 60px; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; transition: transform 0.05s linear; }
 .joystick-move .joystick-knob { background: radial-gradient(circle at 40% 40%, #6cf, #1a3a6a); border: 2px solid #9cf; box-shadow: 0 0 20px rgba(68,170,255,0.9); }
 .joystick-aim .joystick-knob { background: radial-gradient(circle at 40% 40%, #f88, #811); border: 2px solid #faa; box-shadow: 0 0 20px rgba(255,80,80,0.9); }
@@ -285,7 +262,6 @@ body.device-mobile #touchControls, body.device-tablet #touchControls { display: 
 .death-sub { color: #89a; letter-spacing: 3px; font-size: 13px; margin-bottom: 32px; }
 .death-buttons { display: flex; flex-direction: column; gap: 12px; }
 
-/* SPECTATE */
 .spectate-panel { position: absolute; top: 16px; left: 16px; background: rgba(0,0,0,0.75); border: 2px solid #fd4; border-radius: 12px; padding: 16px; min-width: 260px; z-index: 40; }
 .spectate-title { font-size: 14px; font-weight: 800; letter-spacing: 3px; color: #fd4; margin-bottom: 12px; }
 .spectate-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; max-height: 200px; overflow-y: auto; }
@@ -302,85 +278,45 @@ body.device-mobile #touchControls, body.device-tablet #touchControls { display: 
 .victory-sub { color: #ffe8a0; letter-spacing: 6px; font-size: 14px; margin-bottom: 40px; }
 .victory-content .btn-huge { min-width: 400px !important; font-size: 22px !important; padding: 24px 60px !important; letter-spacing: 6px !important; }
 
-/* MODAL */
-.modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(4px); }
-.modal-content { background: linear-gradient(180deg, #1a1f3a, #0f1428); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 32px; min-width: 400px; max-width: 92vw; display: flex; flex-direction: column; gap: 8px; }
-.modal-content h2 { font-size: 20px; margin-bottom: 8px; color: #4af; letter-spacing: 2px; }
-.modal-content label { font-size: 11px; color: #89a; text-transform: uppercase; letter-spacing: 2px; margin-top: 10px; }
-.skins-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.skin-option { background: rgba(0,0,0,0.3); border-radius: 10px; padding: 4px; cursor: pointer; border: 2px solid transparent; }
-.skin-option.selected { border-color: #4af; box-shadow: 0 0 16px rgba(68,170,255,0.4); }
-.modal-content .btn { min-width: auto; margin-top: 16px; }
-
 /* RESPONSIVE */
 @media (max-width: 1024px) {
-  .menu-title { font-size: 26px; letter-spacing: 3px; }
+  .menu-title { font-size: 26px; }
   .btn-huge { font-size: 20px !important; padding: 22px 60px !important; min-width: 300px !important; }
   .logo span { display: none; }
   .logo-img { width: 36px; height: 36px; }
   .profiles-content { flex-direction: column; padding: 4px 12px 8px; gap: 8px; }
-  .account-list { min-height: 90px; max-height: 130px; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; }
-  .account-card { padding: 8px 6px; }
-  .account-card canvas { max-width: 45px; max-height: 45px; }
-  .account-card .name { font-size: 11px; }
-  .account-card .real { font-size: 9px; }
+  .account-list { min-height: 90px; max-height: 130px; }
   .account-right { width: 100%; max-height: 55vh; overflow-y: auto; }
-  .selected-preview { padding: 8px 10px; }
   .selected-preview canvas { max-width: 70px; max-height: 70px; }
-  .preview-pseudo { font-size: 15px; }
-  .preview-skins { grid-template-columns: repeat(6, 1fr); gap: 3px; }
-  .selected-preview .btn { padding: 10px; font-size: 13px; }
 }
 
 @media (max-width: 768px) {
-  .menu-title { font-size: 20px; letter-spacing: 2px; }
-  .menu-sub { font-size: 11px; }
+  .menu-title { font-size: 20px; }
   .btn-huge { font-size: 16px !important; padding: 18px 40px !important; min-width: 240px !important; }
   .login-box { padding: 24px 20px; min-width: auto; width: 92vw; }
   .login-logo { width: 100px; }
-  .login-box h1 { font-size: 15px; }
-  .profiles-header { padding: 8px 16px 2px; }
-  .profiles-header h1 { font-size: 12px; }
-  .mini-logo { width: 32px; }
-  .profiles-content { padding: 2px 8px 6px; gap: 6px; }
-  .account-list { min-height: 70px; max-height: 100px; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); }
-  .account-card { padding: 6px 4px; }
-  .account-card canvas { max-width: 35px; max-height: 35px; }
-  .account-card .name { font-size: 10px; }
-  .account-card .real { display: none; }
-  .browser-tabs { overflow-x: auto; }
-  .room-item { padding: 12px; flex-direction: column; gap: 10px; align-items: stretch; }
-  .join-btn { width: 100%; }
-  .players-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
-  .player-card { padding: 10px 6px; }
-  #statusBars { width: 160px; bottom: 14px; left: 14px; gap: 6px; }
-  .bar { height: 10px; }
-  .bar-label { font-size: 10px; width: 22px; }
   #minimap { width: 80px !important; height: 80px !important; top: 8px; right: 8px; }
-  #scoreboard { font-size: 9px; padding: 4px 8px; top: 96px; right: 8px; min-width: 100px; max-width: 130px; max-height: 30vh; }
-  .alive-counter { font-size: 10px !important; padding: 4px 12px !important; top: 46px !important; letter-spacing: 2px; }
+  #scoreboard { font-size: 9px; padding: 4px 8px; top: 96px; right: 8px; min-width: 100px; max-width: 130px; }
+  .alive-counter { font-size: 10px !important; padding: 4px 12px !important; top: 46px !important; }
   .kill-feed { top: 76px; }
   .kill-feed-item { font-size: 10px; padding: 4px 10px; }
   .match-timer { font-size: 12px; padding: 4px 12px; }
+  .fps-counter { top: 44px; right: 8px; font-size: 10px; padding: 3px 8px; }
   .weapon-bar { bottom: 170px; right: 12px; padding: 4px; gap: 4px; }
   .weapon-slot { width: 32px; height: 32px; font-size: 11px; }
   .chat-box { width: 180px; max-height: 90px; bottom: 12px; left: 12px; }
   .chat-messages { font-size: 10px; max-height: 60px; }
-  .death-content { padding: 28px 24px; }
-  .death-content h1 { font-size: 32px; }
-  .victory-content { padding: 30px 24px; }
-  .victory-content h1 { font-size: 40px; }
-  .victory-trophy { font-size: 60px; }
+  .level-indicator { top: 78px; left: 14px; font-size: 11px; padding: 4px 12px; }
+  .dash-btn { width: 56px; height: 56px; font-size: 22px; bottom: 180px; right: 14px; }
+  #statusBars { width: 160px; bottom: 14px; left: 14px; gap: 6px; }
+  .bar { height: 10px; }
+  .bar-label { font-size: 10px; width: 22px; }
 }
 
 @media (max-width: 768px) and (orientation: portrait) {
-  .profiles-content { flex-direction: row; gap: 8px; padding: 4px 8px 6px; flex: 1; min-height: 0; }
-  .account-list { flex: 1; min-height: 0; max-height: none; grid-template-columns: 1fr; gap: 6px; overflow-y: auto; padding-right: 4px; }
-  .account-right { width: 52%; max-height: none; flex-shrink: 0; overflow: hidden; }
-  .selected-preview { padding: 6px; }
-  .selected-preview canvas { max-width: 70px; max-height: 70px; }
-  .preview-skins { grid-template-columns: repeat(3, 1fr); gap: 3px; }
-  .selected-preview .btn { padding: 8px; font-size: 11px; }
+  .profiles-content { flex-direction: row; gap: 8px; }
+  .account-list { flex: 1; grid-template-columns: 1fr; }
+  .account-right { width: 52%; }
 }
 
 @media (max-height: 500px) {
@@ -389,23 +325,6 @@ body.device-mobile #touchControls, body.device-tablet #touchControls { display: 
   .joystick-aim  { right: 16px; }
   .joystick-ring { width: 100px; height: 100px; }
   .joystick-knob { width: 48px; height: 48px; }
-  .joystick-label { font-size: 9px; }
-  #minimap { width: 70px !important; height: 70px !important; top: 8px; right: 8px; }
-  #scoreboard { top: 86px; right: 8px; font-size: 9px; padding: 4px 6px; min-width: 80px; max-width: 100px; }
-  .alive-counter { font-size: 10px !important; padding: 4px 12px !important; }
-  .profiles-header { padding: 4px 12px 2px; }
-  .mini-logo { width: 28px; }
-  .profiles-header h1 { font-size: 11px; }
-  .profiles-header p { display: none; }
-  .account-list { min-height: 60px; max-height: 80px; }
-  .account-card { padding: 4px 6px; }
-  .account-card canvas { max-width: 32px; max-height: 32px; }
-  .account-card .name { font-size: 10px; }
-  .selected-preview canvas { max-width: 50px; max-height: 50px; }
-  .preview-pseudo { font-size: 12px; }
-  .preview-real { display: none; }
-  .preview-skins-label { display: none; }
-  .selected-preview .btn { padding: 6px; font-size: 10px; }
 }
 
 ::-webkit-scrollbar { width: 8px; }
