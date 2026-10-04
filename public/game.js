@@ -1,6 +1,6 @@
 /* ==================================================================
-   TANK.IO — Client V3
-   Fix WebSocket Render + Reconnect auto + Health check
+   TANK.IO — Client V4
+   Carte 8000×8000 • Fix tir • Fix disparitions • Anti-clignotement
    ================================================================== */
 
 /* ============================================================
@@ -80,7 +80,6 @@ function updateDeviceBadge() {
   const icon = document.getElementById("deviceIcon");
   const label = document.getElementById("deviceLabel");
   if (!badge) return;
-
   badge.className = "device-badge detected";
 
   if (deviceType === "console") {
@@ -122,7 +121,7 @@ detectDevice();
 applyDeviceClass();
 updateControlsHint();
 
-window.addEventListener("gamepadconnected", e => {
+window.addEventListener("gamepadconnected", () => {
   detectDevice(); applyDeviceClass(); updateControlsHint(); updateDeviceBadge();
 });
 window.addEventListener("gamepaddisconnected", () => {
@@ -140,7 +139,7 @@ window.addEventListener("resize", () => {
 });
 
 /* ============================================================
-   4. ACCOUNTS (localStorage)
+   4. ACCOUNTS
    ============================================================ */
 function loadAccounts() {
   try { return JSON.parse(localStorage.getItem("accounts") || "[]"); }
@@ -164,13 +163,14 @@ let serverState = {
   killFeed: [], matchTime: 0
 };
 let myAngle = 0;
+let pendingAngle = 0;
+let pendingAngleTime = 0;
 let dead = false, spectating = null;
 const keys = { up: false, down: false, left: false, right: false };
 let socket = null;
 let socketConnected = false;
 
 let damageNumbers = [];
-let shieldBreakFx = [];
 let bulletExplosions = [];
 let shakeTime = 0;
 let shakeIntensity = 0;
@@ -258,11 +258,10 @@ function showScreen(name) {
 }
 
 /* ============================================================
-   8. SOCKET — FIX WEBSOCKET RENDER
+   8. SOCKET
    ============================================================ */
 function connectSocket() {
   if (socket) return;
-
   console.log("📡 Tentative de connexion Socket.IO…");
   const statusEl = $("connectionStatus");
 
@@ -283,43 +282,29 @@ function connectSocket() {
     socketConnected = true;
     myId = socket.id;
     console.log("✅ Socket connecté :", socket.id);
-    if (statusEl) {
-      statusEl.textContent = "✅ Connecté au serveur";
-      statusEl.style.color = "#4f4";
-    }
+    if (statusEl) { statusEl.textContent = "✅ Connecté au serveur"; statusEl.style.color = "#4f4"; }
     socket.emit("list-rooms");
   });
 
   socket.on("connect_error", (err) => {
     console.warn("⚠️ Erreur connexion :", err.message);
-    if (statusEl) {
-      statusEl.textContent = "⏳ Connexion au serveur…";
-      statusEl.style.color = "#fd4";
-    }
+    if (statusEl) { statusEl.textContent = "⏳ Connexion…"; statusEl.style.color = "#fd4"; }
   });
 
   socket.on("disconnect", (reason) => {
     socketConnected = false;
     console.warn("🔌 Déconnecté :", reason);
-    if (statusEl) {
-      statusEl.textContent = "🔌 Reconnexion…";
-      statusEl.style.color = "#f55";
-    }
+    if (statusEl) { statusEl.textContent = "🔌 Reconnexion…"; statusEl.style.color = "#f55"; }
   });
 
-  socket.on("reconnect", () => {
-    console.log("🔁 Reconnecté !");
-    socketConnected = true;
-  });
+  socket.on("reconnect", () => { socketConnected = true; });
 
-  // ---------- ROOM LIST ----------
   socket.on("room-list-update", list => {
     renderRoomList(list);
     const el = $("onlineCount");
     if (el) el.textContent = `${list.length} partie${list.length > 1 ? "s" : ""} active${list.length > 1 ? "s" : ""}`;
   });
 
-  // ---------- ROOM CREATED / JOINED ----------
   socket.on("room-created", data => {
     currentRoomId = data.id;
     roomCodeDisplay.textContent = data.id;
@@ -346,7 +331,6 @@ function connectSocket() {
     if (socket) socket.emit("list-rooms");
   });
 
-  // ---------- LOBBY ----------
   socket.on("lobby-update", data => {
     lobbyPlayers = data.players;
     hostId = data.hostId;
@@ -359,12 +343,10 @@ function connectSocket() {
     updateActionButtons();
   });
 
-  // ---------- GAME START ----------
   socket.on("game-started", () => {
     gameStarted = true;
     dead = false;
     damageNumbers = [];
-    shieldBreakFx = [];
     bulletExplosions = [];
     shakeTime = 0;
     if (chatMessages) chatMessages.innerHTML = "";
@@ -381,7 +363,6 @@ function connectSocket() {
   socket.on("victory", data => {
     gameStarted = false;
     $("spectatePanel").classList.add("hidden");
-
     if (data.winnerId === myId) {
       $("deathScreen").classList.add("hidden");
       $("victoryScreen").classList.remove("hidden");
@@ -391,7 +372,6 @@ function connectSocket() {
     }
   });
 
-  // ---------- COMBAT ----------
   socket.on("hit", data => {
     if (data.hpDamage > 0) {
       damageNumbers.push({
@@ -410,16 +390,14 @@ function connectSocket() {
 
   socket.on("dash-effect", data => {
     bulletExplosions.push({
-      x: data.x, y: data.y, life: 25, maxLife: 25, color: "#4af", type: "dash"
+      x: data.x, y: data.y, life: 25, maxLife: 25, color: "#4af"
     });
   });
 
-  // ---------- KILL FEED ----------
   socket.on("kill-feed-update", feed => {
     renderKillFeed(feed);
   });
 
-  // ---------- CHAT ----------
   socket.on("chat-message", data => {
     if (!chatMessages) return;
     const el = document.createElement("div");
@@ -429,7 +407,6 @@ function connectSocket() {
     if (chatMessages.children.length > 30) chatMessages.removeChild(chatMessages.firstChild);
   });
 
-  // ---------- MORT / RESPAWN ----------
   socket.on("player-died", data => {
     if (data.victimId === myId) {
       dead = true;
@@ -458,18 +435,14 @@ function connectSocket() {
     }
   });
 
-  // ---------- LEVEL UP ----------
   socket.on("level-up", data => {
-    if (data.playerId === myId) {
-      if (levelIndicatorEl) {
-        levelIndicatorEl.textContent = `NIVEAU ${data.level}`;
-        levelIndicatorEl.style.transform = "scale(1.3)";
-        setTimeout(() => { levelIndicatorEl.style.transform = "scale(1)"; }, 300);
-      }
+    if (data.playerId === myId && levelIndicatorEl) {
+      levelIndicatorEl.textContent = `NIVEAU ${data.level}`;
+      levelIndicatorEl.style.transform = "scale(1.3)";
+      setTimeout(() => { levelIndicatorEl.style.transform = "scale(1)"; }, 300);
     }
   });
 
-  // ---------- STATE ----------
   socket.on("state", s => {
     serverState = s;
     const me = s.players[myId];
@@ -615,7 +588,6 @@ const detectInterval = setInterval(() => {
 
 setTimeout(() => { clearInterval(detectInterval); updateDeviceBadge(); }, 1500);
 
-// Passage à l'écran profils après 4s (attendre la connexion)
 setTimeout(() => {
   window.__stopGalaxy && window.__stopGalaxy();
   showScreen("profiles");
@@ -1103,7 +1075,6 @@ window.addEventListener("keydown", e => {
   if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
   const w = weaponKeys[e.key];
   if (w && socket && gameStarted) socket.emit("switch-weapon", w);
-  // Dash
   if (e.key === " " && socket && gameStarted && !dead) {
     socket.emit("dash");
     e.preventDefault();
@@ -1168,6 +1139,8 @@ canvas.addEventListener("mousemove", e => {
   const wx = e.clientX - rect.left + cam.x;
   const wy = e.clientY - rect.top + cam.y;
   myAngle = Math.atan2(wy - me.y, wx - me.x);
+  pendingAngle = myAngle;
+  pendingAngleTime = Date.now();
 });
 
 canvas.addEventListener("mousedown", e => {
@@ -1175,6 +1148,7 @@ canvas.addEventListener("mousedown", e => {
   if (e.button !== 0 || !gameStarted || !myId || !socket) return;
   const me = serverState.players[myId];
   if (!me || !me.alive) return;
+  // ⚠️ On envoie l'angle RÉEL au moment du clic
   socket.emit("shoot", { angle: myAngle });
 });
 
@@ -1210,7 +1184,6 @@ function resetKnob(el) {
   el.style.transform = "translate(-50%, -50%)";
 }
 
-// MOVE
 moveJoystick.addEventListener("touchstart", e => {
   if (!gameStarted || dead) return;
   e.preventDefault();
@@ -1263,7 +1236,6 @@ function endMoveJoystick(e) {
 moveJoystick.addEventListener("touchend", endMoveJoystick);
 moveJoystick.addEventListener("touchcancel", endMoveJoystick);
 
-// AIM
 aimJoystick.addEventListener("touchstart", e => {
   if (!gameStarted || dead) return;
   e.preventDefault();
@@ -1293,6 +1265,8 @@ aimJoystick.addEventListener("touchmove", e => {
   const mag = Math.hypot(dx, dy) / KNOB_RADIUS;
   if (mag < DEADZONE) return;
   myAngle = Math.atan2(dy, dx);
+  pendingAngle = myAngle;
+  pendingAngleTime = Date.now();
 }, { passive: false });
 
 function endAimJoystick(e) {
@@ -1307,7 +1281,6 @@ function endAimJoystick(e) {
 aimJoystick.addEventListener("touchend", endAimJoystick);
 aimJoystick.addEventListener("touchcancel", endAimJoystick);
 
-// Tir auto
 let lastTouchShot = 0;
 setInterval(() => {
   if (!aimJoyState.active) return;
@@ -1352,8 +1325,12 @@ function pollGamepad() {
     const ry = gp.axes[3] || 0;
     if (Math.hypot(rx, ry) > deadzone) {
       myAngle = Math.atan2(ry, rx);
+      pendingAngle = myAngle;
+      pendingAngleTime = Date.now();
     } else if (Math.hypot(lx, ly) > deadzone) {
       myAngle = Math.atan2(ly, lx);
+      pendingAngle = myAngle;
+      pendingAngleTime = Date.now();
     }
 
     const rtPressed = gp.buttons[7] && gp.buttons[7].pressed;
@@ -1366,12 +1343,10 @@ function pollGamepad() {
       }
     }
 
-    // Dash bouton A
     if (gp.buttons[0] && gp.buttons[0].pressed && socket && !dead) {
       socket.emit("dash");
     }
 
-    // Switch armes croix
     if (gp.buttons[12] && gp.buttons[12].pressed) socket.emit("switch-weapon", "pistol");
     if (gp.buttons[13] && gp.buttons[13].pressed) socket.emit("switch-weapon", "smg");
     if (gp.buttons[14] && gp.buttons[14].pressed) socket.emit("switch-weapon", "shotgun");
@@ -1508,8 +1483,8 @@ function drawWalls() {
 function drawGrid() {
   if (PERF_MODE) return;
   const cam = getCamera();
-  const g = 120;
-  ctx.strokeStyle = "rgba(255,255,255,0.02)";
+  const g = 200;
+  ctx.strokeStyle = "rgba(255,255,255,0.015)";
   ctx.lineWidth = 1;
   const sx = Math.floor(cam.x / g) * g;
   const sy = Math.floor(cam.y / g) * g;
@@ -1526,8 +1501,8 @@ function drawGrid() {
     ctx.stroke();
   }
   ctx.strokeStyle = "#4af";
-  ctx.lineWidth = 4;
-  ctx.strokeRect(-cam.x, -cam.y, 5000, 5000);
+  ctx.lineWidth = 6;
+  ctx.strokeRect(-cam.x, -cam.y, 8000, 8000);
 }
 
 function drawBulletExplosions() {
@@ -1557,14 +1532,22 @@ function updateBulletExplosions() {
 
 function drawPlayer(p, isMe) {
   const cam = getCamera();
-  const x = p.x - cam.x, y = p.y - cam.y;
 
+  // ⚠️ Anti-clignotement : interpolation de la position
+  if (!p.smoothX) { p.smoothX = p.x; p.smoothY = p.y; }
+  p.smoothX += (p.x - p.smoothX) * 0.35;
+  p.smoothY += (p.y - p.smoothY) * 0.35;
+
+  const x = p.smoothX - cam.x;
+  const y = p.smoothY - cam.y;
+
+  // Ombre
   ctx.fillStyle = "rgba(0,0,0,0.3)";
   ctx.beginPath();
   ctx.ellipse(x, y + 6, 32, 12, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Aura de niveau
+  // Aura niveau
   if (p.level && p.level > 1) {
     ctx.strokeStyle = `rgba(170,68,255,${0.3 + p.level * 0.1})`;
     ctx.lineWidth = 2;
@@ -1573,6 +1556,7 @@ function drawPlayer(p, isMe) {
     ctx.stroke();
   }
 
+  // Dash effect
   if (p.dashing) {
     ctx.fillStyle = "rgba(68,170,255,0.3)";
     ctx.beginPath();
@@ -1580,17 +1564,19 @@ function drawPlayer(p, isMe) {
     ctx.fill();
   }
 
+  // Tank
   ctx.save();
   ctx.translate(x, y);
   drawTankShape(ctx, p.skin, p.angle);
   ctx.restore();
 
+  // Pseudo
   ctx.fillStyle = isMe ? "#4af" : "#fff";
   ctx.font = "bold 13px Segoe UI, Arial";
   ctx.textAlign = "center";
   ctx.fillText(p.pseudo, x, y - 50);
 
-  // Niveau au-dessus
+  // Niveau
   if (p.level && p.level > 1) {
     ctx.fillStyle = "#a4f";
     ctx.font = "bold 11px Segoe UI, Arial";
@@ -1677,7 +1663,7 @@ function drawMinimap() {
   if (PERF_MODE && minimapFrame % 3 !== 0) return;
 
   const size = minimap.width;
-  const scale = size / 5000;
+  const scale = size / 8000;
 
   mmCtx.clearRect(0, 0, size, size);
   mmCtx.fillStyle = "rgba(10, 20, 40, 0.9)";
@@ -1690,7 +1676,6 @@ function drawMinimap() {
     });
   }
 
-  // Autres joueurs sur la minimap
   Object.values(serverState.players).forEach(p => {
     if (!p.alive || p.id === myId) return;
     mmCtx.fillStyle = "#f55";

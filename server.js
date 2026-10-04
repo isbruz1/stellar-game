@@ -1,6 +1,6 @@
 /* ==================================================================
-   TANK.IO — Serveur V3
-   Fix WebSocket Render + Health check + Optimisé 30+ joueurs
+   TANK.IO — Serveur V4
+   Carte 8000×8000 • Fix direction • Fix disparitions • Optimisé classe
    ================================================================== */
 
 const express = require("express");
@@ -11,15 +11,8 @@ const { Server } = require("socket.io");
 const app = express();
 const server = http.createServer(app);
 
-// ============================================================
-//  SOCKET.IO — Configuration pour Render (fix WebSocket)
-// ============================================================
 const io = new Server(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
-  },
-  // ⚠️ IMPORTANT : polling EN PREMIER pour Render
+  cors: { origin: "*", methods: ["GET", "POST"] },
   transports: ["polling", "websocket"],
   allowUpgrades: true,
   pingTimeout: 25000,
@@ -30,7 +23,7 @@ const io = new Server(server, {
 
 app.use(express.static(path.join(__dirname, "public")));
 
-// Route de santé pour UptimeRobot
+// Route de santé
 app.get("/health", (req, res) => {
   res.status(200).json({
     status: "ok",
@@ -43,7 +36,7 @@ app.get("/health", (req, res) => {
 // ============================================================
 //  CONSTANTES
 // ============================================================
-const MAP_W = 5000, MAP_H = 5000;
+const MAP_W = 8000, MAP_H = 8000;
 const PLAYER_RADIUS = 26;
 const PLAYER_SPEED = 3.6;
 const MAX_HP = 100;
@@ -78,31 +71,31 @@ function genRoomId() {
 
 function genWall() {
   return {
-    x: 300 + Math.random() * (MAP_W - 800),
-    y: 300 + Math.random() * (MAP_H - 800),
-    w: 150 + Math.random() * 350,
-    h: 50 + Math.random() * 150
+    x: 400 + Math.random() * (MAP_W - 1000),
+    y: 400 + Math.random() * (MAP_H - 1000),
+    w: 180 + Math.random() * 400,
+    h: 60 + Math.random() * 180
   };
 }
 
 function genForest() {
-  const cx = 400 + Math.random() * (MAP_W - 800);
-  const cy = 400 + Math.random() * (MAP_H - 800);
+  const cx = 500 + Math.random() * (MAP_W - 1000);
+  const cy = 500 + Math.random() * (MAP_H - 1000);
   const trees = [];
-  const count = 12 + Math.floor(Math.random() * 15);
+  const count = 15 + Math.floor(Math.random() * 20);
   for (let i = 0; i < count; i++) {
     const a = Math.random() * Math.PI * 2;
-    const d = Math.random() * 250;
-    trees.push({ x: cx + Math.cos(a) * d, y: cy + Math.sin(a) * d, r: 24 + Math.random() * 14 });
+    const d = Math.random() * 300;
+    trees.push({ x: cx + Math.cos(a) * d, y: cy + Math.sin(a) * d, r: 26 + Math.random() * 16 });
   }
   return trees;
 }
 
 function generateMap() {
   const walls = [];
-  for (let i = 0; i < 32; i++) walls.push(genWall());
+  for (let i = 0; i < 70; i++) walls.push(genWall());
   const forests = [];
-  for (let i = 0; i < 10; i++) forests.push(genForest());
+  for (let i = 0; i < 25; i++) forests.push(genForest());
   return { walls, forests };
 }
 
@@ -147,8 +140,8 @@ function findSafeSpawn(room, preferX, preferY) {
     return true;
   };
   if (tryPos(preferX, preferY)) return { x: preferX, y: preferY };
-  for (let ring = 1; ring <= 40; ring++) {
-    const dist = ring * 60;
+  for (let ring = 1; ring <= 60; ring++) {
+    const dist = ring * 70;
     const count = 8 + ring * 2;
     for (let i = 0; i < count; i++) {
       const a = (i / count) * Math.PI * 2;
@@ -224,7 +217,8 @@ function resetForGame(room) {
 
   const ids = Object.keys(room.players);
   const count = ids.length;
-  const spawnRadius = Math.min(1800, 400 + count * 25);
+  // Spawn radius adapté à la grande carte
+  const spawnRadius = Math.min(2800, 600 + count * 40);
 
   ids.forEach((id, i) => {
     const p = room.players[id];
@@ -455,7 +449,9 @@ io.on("connection", socket => {
     if (now - p.lastShot < weapon.cooldown) return;
     p.lastShot = now;
 
-    if (typeof data.angle === "number") p.angle = data.angle;
+    // ⚠️ Fix direction : on prend l'angle envoyé par le client
+    const shootAngle = typeof data.angle === "number" ? data.angle : p.angle;
+    p.angle = shootAngle;
 
     const md = room.mapData;
     let offset = 34;
@@ -467,11 +463,11 @@ io.on("connection", socket => {
 
     for (let i = 0; i < weapon.bullets; i++) {
       const spread = (Math.random() - 0.5) * weapon.spread;
-      const angle = p.angle + spread;
+      const angle = shootAngle + spread;
       room.bullets.push({
         id: ++room.bulletSeq,
-        x: p.x + Math.cos(p.angle) * offset,
-        y: p.y + Math.sin(p.angle) * offset,
+        x: p.x + Math.cos(shootAngle) * offset,
+        y: p.y + Math.sin(shootAngle) * offset,
         vx: Math.cos(angle) * weapon.speed,
         vy: Math.sin(angle) * weapon.speed,
         owner: socket.id,
@@ -516,7 +512,7 @@ io.on("connection", socket => {
 });
 
 // ============================================================
-//  BOUCLE DE JEU (60 Hz logique, 15 Hz émission)
+//  BOUCLE DE JEU
 // ============================================================
 function tick() {
   tickCounter++;
@@ -591,7 +587,7 @@ function tick() {
       const p = room.players[id];
       if (!p.alive && p.respawnAt > 0 && now >= p.respawnAt) {
         const a = Math.random() * Math.PI * 2;
-        const r = 1000 + Math.random() * 800;
+        const r = 1500 + Math.random() * 1200;
         const safe = findSafeSpawn(room, MAP_W / 2 + Math.cos(a) * r, MAP_H / 2 + Math.sin(a) * r);
         p.x = safe.x; p.y = safe.y;
         p.hp = MAX_HP;
@@ -602,8 +598,8 @@ function tick() {
       }
     }
 
-    // Envoi state 15 Hz (pour 30+ joueurs)
-    if (tickCounter % 4 === 0) {
+    // Envoi state à 20 Hz (3 frames sur 4)
+    if (tickCounter % 3 === 0) {
       io.to(room.id).emit("state", buildState(room));
     }
 
@@ -637,5 +633,6 @@ setInterval(tick, 1000 / 60);
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`✅ Tank.io — Serveur démarré sur le port ${PORT}`);
-  console.log(`🌐 Health check : http://localhost:${PORT}/health`);
+  console.log(`🗺️ Carte : ${MAP_W}×${MAP_H}`);
+  console.log(`🌐 Health : http://localhost:${PORT}/health`);
 });
