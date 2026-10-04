@@ -1,6 +1,6 @@
 /* ==================================================================
-   STELLAR GAME — Serveur V11
-   Armes multiples • Power-ups • Kill feed • Chat • K/D • Timer
+   TANK.IO — Serveur V3
+   Fix WebSocket Render + Health check + Optimisé 30+ joueurs
    ================================================================== */
 
 const express = require("express");
@@ -10,41 +10,62 @@ const { Server } = require("socket.io");
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: "*" }, pingTimeout: 30000, pingInterval: 10000 });
+
+// ============================================================
+//  SOCKET.IO — Configuration pour Render (fix WebSocket)
+// ============================================================
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  },
+  // ⚠️ IMPORTANT : polling EN PREMIER pour Render
+  transports: ["polling", "websocket"],
+  allowUpgrades: true,
+  pingTimeout: 25000,
+  pingInterval: 10000,
+  connectTimeout: 20000,
+  maxHttpBufferSize: 1e6
+});
 
 app.use(express.static(path.join(__dirname, "public")));
 
-// ---------- Constantes ----------
-const MAP_W = 4500, MAP_H = 4500;
-const PLAYER_RADIUS = 24;
-const PLAYER_SPEED = 3.4;
+// Route de santé pour UptimeRobot
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    status: "ok",
+    rooms: Object.keys(rooms || {}).length,
+    players: Object.values(rooms || {}).reduce((sum, r) => sum + Object.keys(r.players).length, 0),
+    uptime: Math.floor(process.uptime())
+  });
+});
+
+// ============================================================
+//  CONSTANTES
+// ============================================================
+const MAP_W = 5000, MAP_H = 5000;
+const PLAYER_RADIUS = 26;
+const PLAYER_SPEED = 3.6;
 const MAX_HP = 100;
-const MAX_SHIELD = 100;
-const MAX_PLAYERS = 50;
-const RESPAWN_DELAY = 5000;
-const MATCH_TIME = 10 * 60 * 1000;
+const MAX_PLAYERS = 40;
+const RESPAWN_DELAY = 4000;
+const DASH_COOLDOWN = 3000;
+const DASH_DURATION = 200;
+const DASH_SPEED = 12;
+const XP_PER_KILL = 100;
 
 // ---------- Armes ----------
 const WEAPONS = {
-  pistol:  { name: "Pistolet",      damage: 25, speed: 9,  cooldown: 350,  bulletLife: 150, spread: 0,    bullets: 1, color: "#ff4" },
-  smg:     { name: "Mitrailleuse",  damage: 12, speed: 11, cooldown: 110,  bulletLife: 130, spread: 0.08, bullets: 1, color: "#fd4" },
-  shotgun: { name: "Shotgun",       damage: 14, speed: 8,  cooldown: 800,  bulletLife: 100, spread: 0.35, bullets: 6, color: "#f94" },
-  sniper:  { name: "Sniper",        damage: 80, speed: 16, cooldown: 1400, bulletLife: 300, spread: 0,    bullets: 1, color: "#f4f" }
+  pistol:  { name: "Pistolet",  damage: 22, speed: 10, cooldown: 320,  bulletLife: 150, spread: 0,    bullets: 1, color: "#ff4" },
+  smg:     { name: "SMG",       damage: 10, speed: 12, cooldown: 90,   bulletLife: 130, spread: 0.1,  bullets: 1, color: "#fd4" },
+  shotgun: { name: "Shotgun",   damage: 12, speed: 8,  cooldown: 750,  bulletLife: 100, spread: 0.35, bullets: 7, color: "#f94" },
+  laser:   { name: "Laser",     damage: 8,  speed: 18, cooldown: 60,   bulletLife: 200, spread: 0.02, bullets: 1, color: "#4ff" },
+  sniper:  { name: "Sniper",    damage: 75, speed: 20, cooldown: 1200, bulletLife: 350, spread: 0,    bullets: 1, color: "#f4f" }
 };
 
-// ---------- Power-ups ----------
-const POWERUP_TYPES = {
-  speed:  { color: "#4af", icon: "⚡", duration: 6000 },
-  shield: { color: "#fd4", icon: "🛡", duration: 8000 },
-  heal:   { color: "#4f4", icon: "❤", duration: 0 },
-  ammo:   { color: "#f4f", icon: "🎁", duration: 0 }
-};
-
-const activeAccounts = {};
-function broadcastLockedAccounts() {
-  io.emit("locked-accounts", Object.values(activeAccounts).map(a => a.pseudoOriginal));
-}
-
+// ============================================================
+//  ROOMS
+// ============================================================
 const rooms = {};
 let tickCounter = 0;
 
@@ -59,68 +80,39 @@ function genWall() {
   return {
     x: 300 + Math.random() * (MAP_W - 800),
     y: 300 + Math.random() * (MAP_H - 800),
-    w: 120 + Math.random() * 300,
-    h: 40 + Math.random() * 120
+    w: 150 + Math.random() * 350,
+    h: 50 + Math.random() * 150
   };
-}
-
-function genRiver() {
-  const points = [];
-  let x = Math.random() * MAP_W;
-  let y = 0;
-  const segments = 5 + Math.floor(Math.random() * 3);
-  for (let i = 0; i <= segments; i++) {
-    points.push({ x, y });
-    x += (Math.random() - 0.5) * 400;
-    y += MAP_H / segments;
-    x = Math.max(200, Math.min(MAP_W - 200, x));
-  }
-  return { points, width: 90 + Math.random() * 50 };
 }
 
 function genForest() {
   const cx = 400 + Math.random() * (MAP_W - 800);
   const cy = 400 + Math.random() * (MAP_H - 800);
   const trees = [];
-  const count = 15 + Math.floor(Math.random() * 15);
+  const count = 12 + Math.floor(Math.random() * 15);
   for (let i = 0; i < count; i++) {
     const a = Math.random() * Math.PI * 2;
-    const d = Math.random() * 220;
-    trees.push({ x: cx + Math.cos(a) * d, y: cy + Math.sin(a) * d, r: 22 + Math.random() * 12 });
+    const d = Math.random() * 250;
+    trees.push({ x: cx + Math.cos(a) * d, y: cy + Math.sin(a) * d, r: 24 + Math.random() * 14 });
   }
   return trees;
 }
 
 function generateMap() {
   const walls = [];
-  for (let i = 0; i < 28; i++) walls.push(genWall());
-  const rivers = [];
-  for (let i = 0; i < 3; i++) rivers.push(genRiver());
+  for (let i = 0; i < 32; i++) walls.push(genWall());
   const forests = [];
-  for (let i = 0; i < 9; i++) forests.push(genForest());
-  return { walls, rivers, forests };
-}
-
-function genPowerup() {
-  const keys = Object.keys(POWERUP_TYPES);
-  const type = keys[Math.floor(Math.random() * keys.length)];
-  return {
-    id: Math.random().toString(36).slice(2, 9),
-    type,
-    x: 300 + Math.random() * (MAP_W - 600),
-    y: 300 + Math.random() * (MAP_H - 600),
-    r: 26,
-    pulse: 0
-  };
+  for (let i = 0; i < 10; i++) forests.push(genForest());
+  return { walls, forests };
 }
 
 function createRoom(name, hostId) {
   let id;
   do { id = genRoomId(); } while (rooms[id]);
   const r = {
-    id, name: name || `Serveur ${id}`, hostId,
+    id, name: name || `Tank.io #${id}`, hostId,
     players: {}, bullets: [], bulletSeq: 0,
-    powerups: [], killFeed: [], chat: [],
+    killFeed: [], chat: [],
     gameStarted: false, matchStartTime: 0, mapData: null,
     maxPlayers: MAX_PLAYERS, victoryDeclared: false
   };
@@ -172,7 +164,7 @@ function publicPlayers(room) {
   const out = {};
   for (const id in room.players) {
     const p = room.players[id];
-    out[id] = { id, pseudo: p.pseudo, realName: p.realName, skin: p.skin, ready: p.ready };
+    out[id] = { id, pseudo: p.pseudo, skin: p.skin, ready: p.ready };
   }
   return out;
 }
@@ -183,19 +175,18 @@ function buildState(room) {
     const pl = room.players[id];
     p[id] = {
       id, x: pl.x, y: pl.y, angle: pl.angle, skin: pl.skin,
-      hp: pl.hp, shield: pl.shield, alive: pl.alive,
-      pseudo: pl.pseudo, realName: pl.realName,
-      kills: pl.kills || 0, deaths: pl.deaths || 0, score: pl.score || 0,
+      hp: pl.hp, alive: pl.alive,
+      pseudo: pl.pseudo,
+      kills: pl.kills || 0, deaths: pl.deaths || 0,
+      level: pl.level || 1, xp: pl.xp || 0,
       weapon: pl.weapon,
-      speedBoost: pl.speedBoost || 0,
-      shieldBoost: pl.shieldBoost || 0
+      dashing: pl.dashing || false
     };
   }
   return {
     players: p,
-    bullets: room.bullets.map(b => ({ id: b.id, x: b.x, y: b.y, color: b.color || "#ff4" })),
+    bullets: room.bullets.map(b => ({ id: b.id, x: b.x, y: b.y, color: b.color })),
     mapData: room.mapData,
-    powerups: room.powerups,
     killFeed: room.killFeed.slice(-5),
     matchTime: room.gameStarted ? Date.now() - room.matchStartTime : 0
   };
@@ -225,67 +216,47 @@ function addKillFeed(room, killerPseudo, victimPseudo, weapon) {
 
 function resetForGame(room) {
   room.bullets = [];
-  room.powerups = [];
   room.killFeed = [];
   room.chat = [];
   room.mapData = generateMap();
   room.victoryDeclared = false;
   room.matchStartTime = Date.now();
 
-  for (let i = 0; i < 8; i++) room.powerups.push(genPowerup());
-
   const ids = Object.keys(room.players);
   const count = ids.length;
-  const spawnRadius = Math.min(1600, 300 + count * 25);
+  const spawnRadius = Math.min(1800, 400 + count * 25);
 
   ids.forEach((id, i) => {
     const p = room.players[id];
     const a = (i / count) * Math.PI * 2;
-    const preferX = MAP_W / 2 + Math.cos(a) * spawnRadius;
-    const preferY = MAP_H / 2 + Math.sin(a) * spawnRadius;
-    const safe = findSafeSpawn(room, preferX, preferY);
-    p.x = safe.x;
-    p.y = safe.y;
+    const safe = findSafeSpawn(room,
+      MAP_W / 2 + Math.cos(a) * spawnRadius,
+      MAP_H / 2 + Math.sin(a) * spawnRadius);
+    p.x = safe.x; p.y = safe.y;
     p.angle = a + Math.PI;
     p.hp = MAX_HP;
-    p.shield = MAX_SHIELD;
     p.alive = true;
     p.lastShot = 0;
     p.weapon = "pistol";
-    p.kills = 0; p.deaths = 0; p.score = 0;
-    p.speedBoost = 0; p.shieldBoost = 0;
-    p.spectating = null; p.spectators = 0; p.respawnAt = 0;
+    p.kills = 0; p.deaths = 0;
+    p.level = 1; p.xp = 0;
+    p.dashing = false; p.lastDash = 0;
+    p.spectating = null;
+    p.spectators = 0;
+    p.respawnAt = 0;
   });
 }
 
+// ============================================================
+//  SOCKET EVENTS
+// ============================================================
 io.on("connection", socket => {
+  console.log(`🔌 Connexion : ${socket.id} (${io.engine.clientsCount} en ligne)`);
   let currentRoom = null;
 
   socket.emit("room-list-update", roomList());
-  socket.emit("locked-accounts", Object.values(activeAccounts).map(a => a.pseudoOriginal));
 
   socket.on("list-rooms", () => socket.emit("room-list-update", roomList()));
-
-  socket.on("claim-account", pseudo => {
-    const key = String(pseudo || "").toLowerCase();
-    if (!key) return socket.emit("claim-result", { ok: false, reason: "pseudo invalide" });
-    const existing = activeAccounts[key];
-    if (existing && existing.socketId !== socket.id) {
-      socket.emit("claim-result", { ok: false, reason: "Ce compte est déjà utilisé ailleurs." });
-      return;
-    }
-    activeAccounts[key] = { socketId: socket.id, pseudoOriginal: pseudo };
-    socket.emit("claim-result", { ok: true });
-    broadcastLockedAccounts();
-  });
-
-  socket.on("release-account", pseudo => {
-    const key = String(pseudo || "").toLowerCase();
-    if (activeAccounts[key] && activeAccounts[key].socketId === socket.id) {
-      delete activeAccounts[key];
-      broadcastLockedAccounts();
-    }
-  });
 
   socket.on("create-room", data => {
     const room = createRoom(data.name, socket.id);
@@ -297,9 +268,9 @@ io.on("connection", socket => {
 
   socket.on("join-room", data => {
     const room = rooms[data.id];
-    if (!room) return socket.emit("join-error", "Serveur introuvable.");
+    if (!room) return socket.emit("join-error", "Partie introuvable.");
     if (Object.keys(room.players).length >= room.maxPlayers)
-      return socket.emit("join-error", "Serveur plein.");
+      return socket.emit("join-error", "Partie pleine.");
     if (room.gameStarted)
       return socket.emit("join-error", "Partie déjà en cours.");
 
@@ -309,14 +280,14 @@ io.on("connection", socket => {
     room.players[socket.id] = {
       id: socket.id,
       pseudo: String(data.pseudo || "Joueur").slice(0, 16),
-      realName: String(data.realName || "").slice(0, 32),
       skin: Number(data.skin) || 0,
       ready: false,
       x: MAP_W / 2, y: MAP_H / 2, angle: 0,
-      hp: MAX_HP, shield: MAX_SHIELD, alive: true, lastShot: 0,
+      hp: MAX_HP, alive: true, lastShot: 0,
       weapon: "pistol",
-      kills: 0, deaths: 0, score: 0,
-      speedBoost: 0, shieldBoost: 0,
+      kills: 0, deaths: 0,
+      level: 1, xp: 0,
+      dashing: false, lastDash: 0,
       spectators: 0, spectating: null, respawnAt: 0
     };
     socket.emit("room-joined", { id: room.id, name: room.name });
@@ -327,18 +298,6 @@ io.on("connection", socket => {
     if (currentRoom) handleLeave(currentRoom, socket.id);
     socket.emit("left-room");
     currentRoom = null;
-  });
-
-  socket.on("update-pseudo", pseudo => {
-    const room = rooms[currentRoom];
-    if (room && room.players[socket.id]) room.players[socket.id].pseudo = String(pseudo).slice(0, 16);
-    if (room) broadcastLobby(room);
-  });
-
-  socket.on("update-realname", name => {
-    const room = rooms[currentRoom];
-    if (room && room.players[socket.id]) room.players[socket.id].realName = String(name).slice(0, 32);
-    if (room) broadcastLobby(room);
   });
 
   socket.on("update-skin", skin => {
@@ -371,8 +330,9 @@ io.on("connection", socket => {
     const p = room.players[socket.id];
     if (p) {
       p.ready = false;
-      p.hp = MAX_HP; p.shield = MAX_SHIELD;
-      p.alive = true; p.spectating = null;
+      p.hp = MAX_HP;
+      p.alive = true;
+      p.spectating = null;
       for (const id in room.players) {
         if (room.players[id].spectating === socket.id) room.players[id].spectating = null;
       }
@@ -403,6 +363,22 @@ io.on("connection", socket => {
     const p = room.players[socket.id];
     if (!p || !p.alive) return;
     if (WEAPONS[weapon]) p.weapon = weapon;
+  });
+
+  socket.on("dash", () => {
+    const room = rooms[currentRoom];
+    if (!room) return;
+    const p = room.players[socket.id];
+    if (!p || !room.gameStarted || !p.alive) return;
+    const now = Date.now();
+    if (now - p.lastDash < DASH_COOLDOWN) return;
+    p.lastDash = now;
+    p.dashing = true;
+    setTimeout(() => {
+      const r = rooms[currentRoom];
+      if (r && r.players[socket.id]) r.players[socket.id].dashing = false;
+    }, DASH_DURATION);
+    io.to(room.id).emit("dash-effect", { playerId: socket.id, x: p.x, y: p.y });
   });
 
   socket.on("spectate", targetId => {
@@ -442,9 +418,7 @@ io.on("connection", socket => {
     if (k.left) dx -= 1;
     if (k.right) dx += 1;
     const len = Math.hypot(dx, dy);
-
-    const speedMult = 1 + (p.speedBoost > 0 ? 0.5 : 0);
-    const speed = PLAYER_SPEED * speedMult;
+    const speed = p.dashing ? DASH_SPEED : PLAYER_SPEED;
 
     let nx = p.x, ny = p.y;
     if (len > 0) {
@@ -510,11 +484,8 @@ io.on("connection", socket => {
     }
   });
 
-  socket.on("disconnect", () => {
-    for (const key in activeAccounts) {
-      if (activeAccounts[key].socketId === socket.id) delete activeAccounts[key];
-    }
-    broadcastLockedAccounts();
+  socket.on("disconnect", (reason) => {
+    console.log(`🔌 Déconnexion : ${socket.id} (${reason})`);
     if (currentRoom) handleLeave(currentRoom, socket.id);
   });
 
@@ -544,13 +515,16 @@ io.on("connection", socket => {
   }
 });
 
+// ============================================================
+//  BOUCLE DE JEU (60 Hz logique, 15 Hz émission)
+// ============================================================
 function tick() {
   tickCounter++;
   for (const rid in rooms) {
     const room = rooms[rid];
     if (!room.gameStarted) continue;
 
-    // BALLES
+    // Balles
     for (let i = room.bullets.length - 1; i >= 0; i--) {
       const b = room.bullets[i];
       b.x += b.vx; b.y += b.vy; b.life--;
@@ -568,29 +542,13 @@ function tick() {
         const p = room.players[id];
         if (!p.alive) continue;
         if (Math.hypot(p.x - b.x, p.y - b.y) < PLAYER_RADIUS) {
-          let dmg = b.damage || 25;
-          let shieldDamage = 0, hpDamage = 0, shieldBroken = false;
-
-          if (p.shield > 0) {
-            const absorbed = Math.min(p.shield, dmg);
-            p.shield -= absorbed;
-            shieldDamage = absorbed;
-            dmg -= absorbed;
-            if (p.shield <= 0 && absorbed > 0) shieldBroken = true;
-          }
-          if (dmg > 0) { p.hp -= dmg; hpDamage = dmg; }
+          const dmg = b.damage || 25;
+          p.hp -= dmg;
           hit = true;
 
           io.to(room.id).emit("hit", {
-            targetId: id, attackerId: b.owner, x: p.x, y: p.y,
-            shieldDamage, hpDamage, shieldBroken
+            targetId: id, attackerId: b.owner, x: p.x, y: p.y, hpDamage: dmg
           });
-
-          if (shieldBroken) {
-            io.to(room.id).emit("shield-broken", { targetId: id, x: p.x, y: p.y });
-            const victimSocket = io.sockets.sockets.get(id);
-            if (victimSocket) victimSocket.emit("screen-shake");
-          }
 
           if (p.hp <= 0) {
             p.hp = 0; p.alive = false;
@@ -600,7 +558,16 @@ function tick() {
             const killer = room.players[b.owner];
             if (killer) {
               killer.kills = (killer.kills || 0) + 1;
-              killer.score = (killer.score || 0) + 100;
+              killer.xp = (killer.xp || 0) + XP_PER_KILL;
+              const newLevel = Math.floor(killer.xp / 200) + 1;
+              if (newLevel > (killer.level || 1)) {
+                killer.level = newLevel;
+                io.to(room.id).emit("level-up", { playerId: b.owner, level: newLevel });
+                if (newLevel >= 2) killer.weapon = "smg";
+                if (newLevel >= 3) killer.weapon = "shotgun";
+                if (newLevel >= 4) killer.weapon = "laser";
+                if (newLevel >= 5) killer.weapon = "sniper";
+              }
             }
 
             const killerPseudo = killer ? killer.pseudo : "?";
@@ -618,59 +585,29 @@ function tick() {
       if (hit) room.bullets.splice(i, 1);
     }
 
-    // RESPAWN
+    // Respawn
     const now = Date.now();
     for (const id in room.players) {
       const p = room.players[id];
       if (!p.alive && p.respawnAt > 0 && now >= p.respawnAt) {
         const a = Math.random() * Math.PI * 2;
-        const r = 800 + Math.random() * 600;
+        const r = 1000 + Math.random() * 800;
         const safe = findSafeSpawn(room, MAP_W / 2 + Math.cos(a) * r, MAP_H / 2 + Math.sin(a) * r);
         p.x = safe.x; p.y = safe.y;
-        p.hp = MAX_HP; p.shield = MAX_SHIELD;
+        p.hp = MAX_HP;
         p.alive = true;
-        p.speedBoost = 0; p.shieldBoost = 0;
         p.weapon = "pistol";
         p.respawnAt = 0;
         io.to(room.id).emit("player-respawned", { playerId: id });
       }
     }
 
-    // POWER-UPS
-    for (let i = room.powerups.length - 1; i >= 0; i--) {
-      const pu = room.powerups[i];
-      pu.pulse = (pu.pulse || 0) + 0.05;
-      for (const id in room.players) {
-        const p = room.players[id];
-        if (!p.alive) continue;
-        if (Math.hypot(p.x - pu.x, p.y - pu.y) < PLAYER_RADIUS + pu.r) {
-          if (pu.type === "heal") p.hp = Math.min(MAX_HP, p.hp + 50);
-          else if (pu.type === "speed") {
-            p.speedBoost = 1;
-            setTimeout(() => { if (room.players[id]) room.players[id].speedBoost = 0; }, POWERUP_TYPES.speed.duration);
-          } else if (pu.type === "shield") {
-            p.shield = MAX_SHIELD;
-            p.shieldBoost = 1;
-            setTimeout(() => { if (room.players[id]) room.players[id].shieldBoost = 0; }, POWERUP_TYPES.shield.duration);
-          } else if (pu.type === "ammo") {
-            p.weapon = ["smg", "shotgun", "sniper"][Math.floor(Math.random() * 3)];
-          }
-          io.to(room.id).emit("powerup-taken", { playerId: id, type: pu.type, x: pu.x, y: pu.y });
-          room.powerups.splice(i, 1);
-          setTimeout(() => {
-            if (room.gameStarted) room.powerups.push(genPowerup());
-          }, 8000);
-          break;
-        }
-      }
-    }
-
-    // ENVOI STATE
-    if (tickCounter % 3 === 0) {
+    // Envoi state 15 Hz (pour 30+ joueurs)
+    if (tickCounter % 4 === 0) {
       io.to(room.id).emit("state", buildState(room));
     }
 
-    // VICTOIRE
+    // Victoire
     const aliveIds = Object.keys(room.players).filter(id => room.players[id].alive);
     const totalPlayers = Object.keys(room.players).length;
 
@@ -683,7 +620,7 @@ function tick() {
       for (const id in room.players) {
         const p = room.players[id];
         p.ready = false;
-        p.hp = MAX_HP; p.shield = MAX_SHIELD;
+        p.hp = MAX_HP;
         p.alive = true;
         p.spectating = null; p.spectators = 0; p.respawnAt = 0;
       }
@@ -694,5 +631,11 @@ function tick() {
 }
 setInterval(tick, 1000 / 60);
 
+// ============================================================
+//  DÉMARRAGE
+// ============================================================
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`✅ Stellar Game — Port ${PORT}`));
+server.listen(PORT, () => {
+  console.log(`✅ Tank.io — Serveur démarré sur le port ${PORT}`);
+  console.log(`🌐 Health check : http://localhost:${PORT}/health`);
+});

@@ -4,13 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>Stellar Game</title>
+<title>Tank.io</title>
 <link rel="icon" type="image/png" href="assets/stellar.png">
 <link rel="apple-touch-icon" href="assets/stellar.png">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
+<!-- LANDSCAPE WARNING -->
 <div id="landscapeWarning" class="landscape-warning hidden">
   <div class="rotate-phone"><div class="phone-icon">📱</div><div class="rotate-arrow">↻</div></div>
   <h1>TOURNE TON TÉLÉPHONE</h1>
@@ -18,24 +19,27 @@
   <div class="rotate-hint"><span>→</span><span>→</span><span>→</span></div>
 </div>
 
+<!-- SPLASH -->
 <div id="splashScreen" class="screen splash-screen">
   <canvas id="galaxyCanvas"></canvas>
   <div class="splash-content">
     <div class="splash-logo-wrap">
       <div class="splash-ring"></div>
       <div class="splash-ring splash-ring-2"></div>
-      <img src="assets/stellar.png" class="splash-logo">
+      <img src="assets/stellar.png" class="splash-logo" alt="Tank.io">
     </div>
-    <div class="splash-title">STELLAR&nbsp;GAME</div>
+    <div class="splash-title">TANK.IO</div>
     <div id="deviceBadge" class="device-badge"><span id="deviceIcon">🔍</span><span id="deviceLabel">DÉTECTION…</span></div>
     <div class="splash-loader"><div class="splash-loader-bar"></div></div>
+    <div id="connectionStatus" class="connection-status">Connexion au serveur…</div>
   </div>
 </div>
 
+<!-- PROFILES -->
 <div id="profilesScreen" class="screen profiles-screen hidden">
   <canvas id="profilesCanvas"></canvas>
   <div class="profiles-header">
-    <img src="assets/stellar.png" class="mini-logo">
+    <img src="assets/stellar.png" class="mini-logo" alt="Tank.io">
     <h1>CHOISIS TON PROFIL</h1>
     <p class="muted">Sélectionne un compte ou crée-en un nouveau</p>
   </div>
@@ -45,7 +49,6 @@
       <div class="selected-preview">
         <canvas id="previewCanvas" width="200" height="200"></canvas>
         <div id="previewPseudo" class="preview-pseudo">—</div>
-        <div id="previewReal" class="preview-real">—</div>
         <div class="preview-skins-label">TON TANK</div>
         <div id="previewSkinPicker" class="preview-skins"></div>
         <button id="enterLobbyBtn" class="btn btn-green" disabled>JOUER</button>
@@ -57,26 +60,26 @@
   </div>
 </div>
 
+<!-- NEW ACCOUNT -->
 <div id="newAccountScreen" class="screen new-account-screen hidden">
   <canvas id="newAccountCanvas"></canvas>
   <div class="login-box">
-    <img src="assets/stellar.png" class="login-logo">
+    <img src="assets/stellar.png" class="login-logo" alt="Tank.io">
     <h1>NOUVEAU PILOTE</h1>
-    <p class="login-sub">Étape 1/2 — Ton identité</p>
+    <p class="login-sub">Étape 1/2 — Ton pseudo</p>
     <label>Pseudo (5 car. min.)</label>
     <input id="pseudoInput" type="text" maxlength="16" autocomplete="off">
     <div id="pseudoError" class="error-msg"></div>
-    <label>Nom réel</label>
-    <input id="realNameInput" type="text" maxlength="32" autocomplete="off">
     <button id="nextToSkinBtn" class="btn btn-green" disabled>SUIVANT →</button>
     <button id="backToProfilesBtn" class="btn btn-red">ANNULER</button>
   </div>
 </div>
 
+<!-- SKIN SELECT -->
 <div id="skinSelectScreen" class="screen new-account-screen hidden">
   <canvas id="skinSelectCanvas"></canvas>
   <div class="login-box">
-    <img src="assets/stellar.png" class="login-logo">
+    <img src="assets/stellar.png" class="login-logo" alt="Tank.io">
     <h1>CHOISIS TON TANK</h1>
     <p class="login-sub">Étape 2/2</p>
     <div id="skinGrid" class="skin-grid"></div>
@@ -85,27 +88,29 @@
   </div>
 </div>
 
+<!-- MAIN MENU -->
 <div id="mainMenuScreen" class="screen hidden">
   <canvas id="menuCanvas"></canvas>
   <div class="top-bar">
-    <div class="logo"><img src="assets/stellar.png" class="logo-img"><span>STELLAR GAME</span></div>
+    <div class="logo"><img src="assets/stellar.png" class="logo-img" alt="Tank.io"><span>TANK.IO</span></div>
     <div class="top-actions">
-      <div class="user-chip"><span id="userPseudo">—</span><span id="userReal" class="user-real">—</span></div>
-      <button id="disconnectBtn" class="icon-btn">🚪</button>
+      <div class="user-chip"><span id="userPseudo">—</span></div>
+      <button id="disconnectBtn" class="icon-btn" title="Déconnexion">🚪</button>
     </div>
   </div>
   <div class="menu-content">
-    <h1 class="menu-title">PRÊT POUR LE DÉCOLLAGE ?</h1>
-    <p class="menu-sub" id="controlsHint">Rejoins une partie ou crée ton propre serveur</p>
+    <h1 class="menu-title">PRÊT POUR LE COMBAT ?</h1>
+    <p class="menu-sub" id="controlsHint"></p>
     <button id="playBtn" class="btn btn-green btn-huge">JOUER</button>
   </div>
-  <div class="menu-footer"><span id="onlineCount">0 serveur actif</span></div>
+  <div class="menu-footer"><span id="onlineCount">0 parties actives</span></div>
 </div>
 
+<!-- SERVER BROWSER -->
 <div id="serverBrowser" class="screen hidden">
   <div class="browser-header">
     <button id="closeBrowser" class="icon-btn">←</button>
-    <h2>NAVIGATEUR DE SERVEURS</h2>
+    <h2>PARTIES DISPONIBLES</h2>
     <div style="width:44px"></div>
   </div>
   <div class="browser-tabs">
@@ -125,16 +130,18 @@
   </div>
   <div id="tab-create" class="tab-panel hidden">
     <div class="create-form">
-      <label>Nom du serveur</label>
-      <input id="serverNameInput" type="text" maxlength="24" placeholder="Mon serveur">
+      <label>Nom de la partie</label>
+      <input id="serverNameInput" type="text" maxlength="24" placeholder="Ma partie">
       <button id="createRoomBtn" class="btn btn-green">CRÉER</button>
+      <p class="muted small">Un code à 5 caractères sera généré.</p>
     </div>
   </div>
 </div>
 
+<!-- LOBBY -->
 <div id="lobbyScreen" class="screen hidden">
   <div class="top-bar">
-    <div class="logo"><img src="assets/stellar.png" class="logo-img"><span>STELLAR GAME</span></div>
+    <div class="logo"><img src="assets/stellar.png" class="logo-img" alt="Tank.io"><span>TANK.IO</span></div>
     <div class="top-actions">
       <div class="room-code-chip">CODE : <strong id="roomCodeDisplay">—</strong></div>
     </div>
@@ -144,34 +151,44 @@
     <div class="players-grid" id="playersGrid"></div>
   </div>
   <div class="bottom-bar">
-    <button id="quitBtn" class="btn btn-red hidden">QUITTER LE SERVEUR</button>
+    <button id="quitBtn" class="btn btn-red hidden">QUITTER</button>
     <button id="actionBtn" class="btn btn-green" disabled>...</button>
   </div>
 </div>
 
+<!-- GAME -->
 <div id="gameScreen" class="screen hidden">
   <canvas id="game"></canvas>
   <div id="hud">
-    <button id="leaveGameBtn" class="icon-btn">←</button>
+    <button id="leaveGameBtn" class="icon-btn" title="Retour au salon">←</button>
     <div id="matchTimer" class="match-timer">10:00</div>
     <div id="aliveCounter" class="alive-counter"></div>
     <div id="killFeed" class="kill-feed"></div>
     <canvas id="minimap" width="180" height="180"></canvas>
     <div id="scoreboard"></div>
     <div id="statusBars">
-      <div class="bar-wrap"><div class="bar-label">HP</div><div class="bar"><div id="hpBar" class="bar-fill hp"></div></div></div>
-      <div class="bar-wrap"><div class="bar-label">🛡</div><div class="bar"><div id="shieldBar" class="bar-fill shield"></div></div></div>
+      <div class="bar-wrap">
+        <div class="bar-label">HP</div>
+        <div class="bar"><div id="hpBar" class="bar-fill hp"></div></div>
+      </div>
+      <div class="bar-wrap">
+        <div class="bar-label">XP</div>
+        <div class="bar"><div id="xpBar" class="bar-fill xp"></div></div>
+      </div>
     </div>
     <div id="weaponBar" class="weapon-bar">
       <div class="weapon-slot active" data-weapon="pistol">1</div>
       <div class="weapon-slot" data-weapon="smg">2</div>
       <div class="weapon-slot" data-weapon="shotgun">3</div>
-      <div class="weapon-slot" data-weapon="sniper">4</div>
+      <div class="weapon-slot" data-weapon="laser">4</div>
+      <div class="weapon-slot" data-weapon="sniper">5</div>
     </div>
+    <div id="levelIndicator" class="level-indicator">NIVEAU 1</div>
     <div id="chatBox" class="chat-box">
       <div id="chatMessages" class="chat-messages"></div>
-      <input id="chatInput" class="chat-input" maxlength="120" placeholder="Appuie sur T pour écrire…">
+      <input id="chatInput" class="chat-input" maxlength="120" placeholder="Appuie sur T…">
     </div>
+    <button id="dashBtn" class="dash-btn" title="Dash (Espace)">💨</button>
   </div>
 
   <div id="touchControls" class="touch-controls hidden">
@@ -188,7 +205,7 @@
   <div id="deathScreen" class="death-screen hidden">
     <div class="death-content">
       <h1>TU ES MORT</h1>
-      <p class="death-sub">Éliminé au combat</p>
+      <p class="death-sub">Réapparition dans 4s…</p>
       <div class="death-buttons">
         <button id="backToLobbyBtn" class="btn btn-green">RETOUR AU SALON</button>
         <button id="spectateBtn" class="btn btn-yellow">👁 SPECTATEUR</button>
@@ -203,25 +220,13 @@
   </div>
 </div>
 
+<!-- VICTORY -->
 <div id="victoryScreen" class="victory-screen hidden">
   <div class="victory-content">
     <div class="victory-trophy">🏆</div>
     <h1>VICTOIRE</h1>
-    <p class="victory-sub">DERNIER SURVIVANT DE LA GALAXIE</p>
-    <button id="returnToServerBtn" class="btn btn-green btn-huge">RETOUR AU SERVEUR</button>
-  </div>
-</div>
-
-<div id="settingsModal" class="modal hidden">
-  <div class="modal-content">
-    <h2>Paramètres</h2>
-    <label>Pseudo</label>
-    <input id="settingsPseudo" type="text" maxlength="16">
-    <label>Nom réel</label>
-    <input id="settingsRealName" type="text" maxlength="32">
-    <label>Skin</label>
-    <div id="skinPicker" class="skins-row"></div>
-    <button id="closeSettings" class="btn btn-green">FERMER</button>
+    <p class="victory-sub">DERNIER SURVIVANT</p>
+    <button id="returnToServerBtn" class="btn btn-green btn-huge">RETOUR</button>
   </div>
 </div>
 
